@@ -135,6 +135,52 @@ terapkan dan uji. Kalau berhasil, baru lanjut ke perubahan lain.
 Klik Pulihkan bawaan dan pastikan seluruh tombol kembali normal. Uji ini yang
 membuat Task 13 aman untuk dieksplorasi.
 
+**Ekspor profil dulu.** Lakukan langkah ini setelah Task 13, saat masih ada
+satu tombol tak kritis yang sengaja dipetakan ulang — kalau tidak, tidak ada
+yang membuktikan pemulihannya benar-benar menulis sesuatu.
+
+Uji "semua tombol kembali normal" tidak cukup: dua asumsi di
+`defaultProfile()` justru tidak akan terlihat olehnya, dan keduanya ada di
+jalur pemulihan.
+
+#### a. Fn masih menjadi Fn?
+
+`defaultProfile()` menulis tombol Fn sebagai `{kind:'key', usage:0xAF}`, ikut
+`code="0xaf"` di XML vendor. **0xAF adalah Reserved di HID Keyboard usage
+page** — itu penanda internal vendor, bukan usage sungguhan. Belum ada yang
+tahu apakah firmware memperlakukannya sebagai "tetap jadi tombol layer" atau
+justru sebagai tombol biasa yang tidak melakukan apa-apa.
+
+Sebelum menekan Pulihkan bawaan, catat satu kombinasi Fn yang berfungsi
+(mis. `Fn` + tombol panah, atau `Fn` + F-key untuk media). Sesudahnya, coba
+kombinasi yang sama.
+
+- masih bekerja → asumsi 0xAF benar, catat di spec;
+- Fn jadi mati total → **berhenti dan laporkan**. Pemulihan tidak boleh
+  dirilis sampai encoding Fn yang benar diketahui.
+
+#### b. Layer Fn pabrik masih ada?
+
+`defaultProfile()` menulis layer Fn nol seluruhnya. Tabel tag spec Bagian 5.5
+menyebut `0x00` sebagai "default / nonaktif" — dua makna yang berlawanan.
+Kalau maksudnya "default firmware", pemulihan ini benar. Kalau maksudnya
+"nonaktif", pemulihan **menghapus layer Fn pabrik**, dan aplikasi tidak bisa
+membangunnya kembali: XML vendor hanya memuat satu layer, jadi tidak ada
+sumber untuk isi layer Fn aslinya.
+
+Uji ini yang menentukannya, dan biayanya permanen kalau ternyata salah — jadi
+kerjakan **setelah** poin (a), dan catat dulu daftar selengkap mungkin
+kombinasi Fn yang berfungsi (media, kecerahan, panah, Del, PrtSc, dan
+seterusnya). Sesudah memulihkan, uji ulang seluruh daftar itu.
+
+- semuanya masih bekerja → `0x00` berarti "default firmware", asumsi aman;
+- semuanya mati → **berhenti dan laporkan**. Layer Fn pabrik hilang dan tidak
+  bisa dikembalikan aplikasi; `defaultProfile()` harus berhenti menulis layer
+  Fn sama sekali sebelum siapa pun memakai tombol pemulihan lagi.
+
+Apa pun hasilnya, catat kembali ke spec Bagian 5.5 dan hapus blok asumsi di
+doc comment `defaultProfile()`.
+
 ---
 
 ## Kalau keyboard jadi aneh

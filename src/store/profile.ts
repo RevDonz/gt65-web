@@ -21,6 +21,31 @@ function emptyLayer(): Entry[] {
  * Profil bawaan memetakan tiap tombol ke usage aslinya. Ini juga
  * berfungsi sebagai jalur pemulihan: menulis profil ini mengembalikan
  * keyboard ke keadaan wajar tanpa perlu software vendor.
+ *
+ * DUA ASUMSI BELUM TERVERIFIKASI, keduanya tepat di jalur pemulihan:
+ *
+ * 1. Tombol Fn. XML vendor memberinya `code="0xaf"` (key_index 96), dan
+ *    0xAF adalah *Reserved* di HID Keyboard usage page — jadi itu penanda
+ *    internal vendor, bukan usage HID sungguhan. Apakah menuliskannya
+ *    sebagai `{kind:'key', usage:0xAF}` mempertahankan perilaku
+ *    layer-shift atau justru mengubah Fn menjadi tombol mati bergantung
+ *    pada firmware, dan belum pernah diuji.
+ *
+ * 2. Layer Fn ditulis nol seluruhnya. Tabel tag spec Bagian 5.5 menyebut
+ *    `0x00` sebagai "default / nonaktif" — dua makna yang berlawanan.
+ *    Kalau artinya "default firmware", pemulihan ini benar. Kalau artinya
+ *    "nonaktif", pemulihan justru MENGHAPUS layer Fn pabrik, dan aplikasi
+ *    tidak bisa membangunnya kembali karena XML vendor hanya memuat satu
+ *    layer. Itu hilangnya fungsi secara permanen dan tak terpulihkan,
+ *    disebabkan oleh tombol pemulihan itu sendiri.
+ *
+ * Keduanya harus dipastikan sebelum "Pulihkan bawaan" boleh disebut aman.
+ * Lihat docs/hardware-checklist.md, Task 14 — uji "semua tombol kembali
+ * normal" saja tidak akan menangkap hilangnya layer Fn.
+ *
+ * NILAI SEMENTARA: `lighting.mode` dan `settings.flags` di bawah adalah
+ * penampung, bukan nilai terkonfirmasi. Daftar nilai mode lampu dan makna
+ * kelima flag masih menunggu langkah hardware (spec Bagian 5.4).
  */
 export function defaultProfile(): Profile {
   const top = emptyLayer();
