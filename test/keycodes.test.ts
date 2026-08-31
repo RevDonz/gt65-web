@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { MEDIA_ACTIONS, SHORTCUTS, MOUSE_ACTIONS, HID_KEYS, HID_KEY_GROUPS } from '../src/gt65/keycodes';
+import { MEDIA_ACTIONS, SHORTCUTS, MOUSE_ACTIONS, HID_KEYS, HID_KEY_GROUPS, EXTRA_USAGES } from '../src/gt65/keycodes';
 import { encodeEntry } from '../src/gt65/protocol';
 import { KEYS } from '../src/gt65/layout';
 
@@ -79,5 +79,31 @@ describe('pemilih tombol memuat seluruh tombol fisik keyboard', () => {
       expect(g.keys.length).toBeGreaterThan(0);
     }
     expect(HID_KEY_GROUPS.flatMap((g) => g.keys)).toEqual(HID_KEYS);
+  });
+});
+
+/**
+ * Regresi kedua: menurunkan `HID_KEYS` murni dari `layout.ts` (fix di atas)
+ * menghapus F1–F12 dan Insert/Home/End/PrtSc/Scroll Lock/Pause dari
+ * pemilih, padahal semuanya fungsi nyata di papan ini lewat kombinasi Fn
+ * menurut manual vendor. Pengguna yang ingin memetakan tombol langsung ke
+ * F5 tidak bisa lagi melakukannya. Tiga tes berikut — usage layout.ts
+ * tersedia (di atas), usage EXTRA_USAGES tersedia, dan tidak ada usage
+ * dobel — bersama menjaga dari kedua regresi: yang lama (usage fisik
+ * hilang) maupun yang baru (usage tanpa tombol fisik hilang).
+ */
+describe('pemilih tombol juga menawarkan usage tanpa tombol fisik (F1-F12, Insert/Home/End, dst.)', () => {
+  test('setiap usage di EXTRA_USAGES tersedia di HID_KEYS', () => {
+    const offered = new Map(HID_KEYS.map((k) => [k.usage, k.label]));
+    const missing = EXTRA_USAGES.filter((e) => !offered.has(e.usage));
+    expect(missing.map((e) => `${e.label} (0x${e.usage.toString(16)})`)).toEqual([]);
+  });
+
+  test('tidak ada usage yang tampil dua kali di seluruh pemilih', () => {
+    const allSourceUsages = [...KEYS.map((k) => k.usage), ...EXTRA_USAGES.map((e) => e.usage)];
+    const distinctSourceCount = new Set(allSourceUsages).size;
+    const hidKeyUsages = HID_KEYS.map((k) => k.usage);
+    expect(new Set(hidKeyUsages).size).toBe(hidKeyUsages.length);
+    expect(HID_KEYS.length).toBe(distinctSourceCount);
   });
 });
