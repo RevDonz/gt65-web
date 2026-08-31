@@ -21,10 +21,11 @@ export const LIGHT_MODES: string[] = [
   'Shuttle', 'LED Off', 'Inwards', 'Floweriness',
 ];
 
-export function LightingPanel({ profile, onChange, onApply }: {
+export function LightingPanel({ profile, onChange, onApply, onApplyVendorReference }: {
   profile: Profile;
   onChange: (p: Profile) => void;
   onApply: () => void;
+  onApplyVendorReference: () => void;
 }) {
   const l = profile.lighting;
   const set = (patch: Partial<typeof l>) =>
@@ -59,6 +60,14 @@ export function LightingPanel({ profile, onChange, onApply }: {
         indeksnya sama dengan nilai byte yang diterima keyboard. Pakai daftar
         ini untuk mencocokkan efek yang terlihat dengan namanya, lalu catat
         hasilnya — lihat docs/hardware-checklist.md.
+        {' '}
+        <strong>Label "Kecepatan" dan "Kecerahan" di bawah juga BELUM
+        DIPASTIKAN.</strong> Keduanya cuma nama yang diambil dari urutan field
+        di disassembly vendor (payload[9] lalu payload[10]) — tidak ada bukti
+        yang menyatakan payload[9] itu kecepatan dan payload[10] itu
+        kecerahan, bukan sebaliknya. Rentang keduanya juga dinaikkan ke 0–15
+        karena paket vendor sungguhan memakai nilai UI 15 dan 10 — jauh di
+        luar rentang 0–4 yang lama.
       </p>
 
       <label className="flex items-center justify-between gap-4">
@@ -73,15 +82,17 @@ export function LightingPanel({ profile, onChange, onApply }: {
       </label>
 
       <label className="flex items-center justify-between gap-4">
-        Kecepatan
-        <input type="range" min={0} max={4} value={l.speed}
-               onChange={(e) => set({ speed: Number(e.target.value) })} />
+        Kecepatan (payload[9]? — label belum pasti)
+        <input type="number" min={0} max={15} value={l.speed}
+               onChange={(e) => set({ speed: Number(e.target.value) })}
+               className="w-24 rounded bg-slate-800 px-2 py-1" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
-        Kecerahan
-        <input type="range" min={0} max={4} value={l.brightness}
-               onChange={(e) => set({ brightness: Number(e.target.value) })} />
+        Kecerahan (payload[10]? — label belum pasti)
+        <input type="number" min={0} max={15} value={l.brightness}
+               onChange={(e) => set({ brightness: Number(e.target.value) })}
+               className="w-24 rounded bg-slate-800 px-2 py-1" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
@@ -95,6 +106,23 @@ export function LightingPanel({ profile, onChange, onApply }: {
               className="rounded bg-emerald-700 px-4 py-2 hover:bg-emerald-600">
         Terapkan pencahayaan
       </button>
+
+      <div className="flex flex-col gap-1 border-t border-slate-700 pt-4">
+        <button onClick={onApplyVendorReference}
+                className="rounded border border-sky-700 bg-sky-950/40 px-4 py-2
+                           text-sky-200 hover:bg-sky-900/40">
+          Kirim nilai vendor (referensi)
+        </button>
+        <p className="text-xs text-slate-400">
+          Mengirim persis paket yang terbaca dari buffer perangkat sungguhan
+          setelah software vendor asli menyalakannya: mode 0x0b, merah penuh,
+          nilai UI 15 dan 10 di dua field yang masih diperdebatkan labelnya.
+          Ini satu-satunya urutan byte yang terbukti pernah membuat keyboard
+          ini menyala — kalau tombol ini menyalakan lampu merah, berarti
+          seluruh jalur di luar rentang nilai kita (transport, framing,
+          payload[8]) sudah benar.
+        </p>
+      </div>
     </section>
   );
 }

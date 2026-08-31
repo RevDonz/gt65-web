@@ -105,6 +105,40 @@ describe('transaksi pencahayaan', () => {
     const d = lighting(cfg)[2];
     expect(d[8]).toBe(1);
   });
+
+  /**
+   * Paket emas: byte-demi-byte sama dengan buffer feature report yang
+   * dibaca balik dari perangkat sungguhan setelah software vendor asli
+   * mengirim paket ini (bukan ditulis ulang oleh app ini). Ini satu-satunya
+   * ground truth yang kita punya untuk `speed`/`brightness` — slider lama
+   * (batas 0-4) tidak pernah bisa menjangkau nilai UI 15 dan 10 yang
+   * dipakai di sini. Kalau tes ini gagal, `lighting()` tidak lagi
+   * menghasilkan byte yang terbukti pernah menyalakan keyboard ini.
+   *
+   * vendor : 0b ff 00 00 00 00 00 00 01 10 0b 00 00 00 aa 55
+   */
+  test('paket referensi vendor cocok byte-demi-byte dengan buffer perangkat', () => {
+    const vendor = [
+      0x0b, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x01, 0x10, 0x0b, 0x00, 0x00, 0x00, 0xaa, 0x55,
+    ];
+    const d = lighting({
+      mode: 0x0b, r: 0xff, g: 0x00, b: 0x00,
+      speed: 15, brightness: 10, direction: 0,
+    })[2];
+    expect([...d.subarray(0, 16)]).toEqual(vendor);
+  });
+
+  /**
+   * Rentang UI diperlebar ke 0-15 karena paket vendor sungguhan di atas
+   * memakai nilai UI 15 dan 10 — jauh di luar batas 0-4 lama. `lighting()`
+   * sendiri tidak boleh memotong nilai ini; pemotongan adalah tugas UI.
+   */
+  test('speed dan brightness menjangkau nilai UI 15 tanpa dipotong', () => {
+    const d = lighting({ ...cfg, speed: 15, brightness: 15 })[2];
+    expect(d[9]).toBe(16);
+    expect(d[10]).toBe(16);
+  });
 });
 
 describe('transaksi pengaturan', () => {

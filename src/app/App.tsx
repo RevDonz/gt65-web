@@ -126,7 +126,14 @@ export function App() {
         )}
         {tab === 'Lampu' && (
           <LightingPanel profile={profile} onChange={setProfile}
-                         onApply={() => dev.send('Terapkan pencahayaan', lighting(profile.lighting))} />
+                         onApply={() => dev.send('Terapkan pencahayaan', lighting(profile.lighting))}
+                         onApplyVendorReference={() => dev.send(
+                           'Kirim nilai vendor (referensi)',
+                           lighting({
+                             mode: 0x0b, r: 0xff, g: 0x00, b: 0x00,
+                             speed: 15, brightness: 10, direction: 0,
+                           }),
+                         )} />
         )}
         {tab === 'Pengaturan' && (
           <SettingsPanel profile={profile} onChange={setProfile}
