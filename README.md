@@ -25,7 +25,8 @@ dan tidak mengembalikan konfigurasinya, tapi langkah probe yang akan
 memastikannya pada hardware sungguhan belum dijalankan (lihat "Yang belum
 diketahui"). Karena itu **aplikasi ini yang menjadi sumber kebenaran**, bukan
 keyboard. Profil disimpan di browser, dan tombol Terapkan selalu menulis
-ulang seluruh konfigurasi. Ekspor profil Anda sebagai cadangan.
+ulang seluruh konfigurasi. Pakai tombol **Ekspor profil** di bar navigasi
+sebagai cadangan — lihat "Cadangan profil" di bawah.
 
 **Mode kering aktif secara bawaan.** Aplikasi menampilkan paket yang akan
 dikirim tanpa benar-benar mengirimnya. Matikan hanya kalau Anda siap menulis.
@@ -81,6 +82,23 @@ npm run build
 
 Kesalahan protokol tidak memunculkan error — keyboard mengabaikan paket yang
 salah tanpa memberi tahu. Golden test byte adalah jaring pengaman utamanya.
+
+## Cadangan profil
+
+Karena keyboard tidak bisa dibaca, aplikasi ini yang menyimpan satu-satunya
+salinan konfigurasi Anda — dan `localStorage` browser bisa hilang kapan saja
+(profil dibersihkan, ganti perangkat, mode privat). Bar navigasi punya dua
+tombol untuk ini:
+
+- **Ekspor profil** mengunduh profil aktif sebagai berkas `.json`, dinamai
+  dari nama profilnya.
+- **Impor profil** membuka dialog berkas untuk memuat kembali berkas `.json`
+  itu. Berkas dengan versi tak dikenal atau struktur rusak ditolak dengan
+  pesan galat, dan profil yang sedang aktif tidak diganti.
+
+Lakukan ekspor sebelum menulis remap tombol — ini yang disebut sebagai
+"cadangan" di bagian atas README ini, dan sebelum menekan **Pulihkan
+bawaan** kalau Anda ingin bisa kembali ke konfigurasi kustom Anda sendiri.
 
 ## Pemulihan
 
