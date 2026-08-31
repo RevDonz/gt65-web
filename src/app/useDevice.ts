@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { requestDevice, sendTransaction, receiveFeatureEcho, DeviceError } from '../gt65/device';
-import { makeEchoResult, makeLogEntry, pushLogEntry } from './log';
+import { formatLogText, makeEchoResult, makeLogEntry, pushLogEntry } from './log';
 import type { EchoResult, LogEntry } from './log';
+import { sendToDevLogSink } from './devLogSink';
 
 export type Status = 'idle' | 'connecting' | 'connected' | 'error';
 
@@ -102,7 +103,7 @@ export function useDevice(dryRun: boolean) {
         break;
     }
 
-    setLog((prev) => pushLogEntry(prev, makeLogEntry({
+    const entry = makeLogEntry({
       at: new Date().toISOString(),
       label: entryLabel,
       decision,
@@ -110,7 +111,17 @@ export function useDevice(dryRun: boolean) {
       connected,
       outcome,
       echo,
-    })));
+    });
+    setLog((prev) => pushLogEntry(prev, entry));
+
+    // Salin entri ini ke dev-server log sink (lihat devLogSink.ts) — tak
+    // aktif di build produksi, dan kegagalannya tak pernah memengaruhi
+    // transaksi nyata di atas. Format persis sama dengan tombol "Salin
+    // log" (satu entri saja) supaya kedua log tidak pernah berbeda cerita.
+    sendToDevLogSink(formatLogText([entry], {
+      dryRun,
+      productName: device?.productName ?? null,
+    }));
   }, [device, dryRun]);
 
   return { device, status, error, connect, send, lastPackets, log };
