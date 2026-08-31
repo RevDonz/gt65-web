@@ -44,7 +44,7 @@ bukan angkanya. Pulihkan kapan saja dengan <code>Fn + \</code>.
   <label>byte[9] <input type="number" id="b9" value="3" min="0" max="255"></label>
   <label>byte[10] <input type="number" id="b10" value="3" min="0" max="255"></label>
   <label>byte[11] <input type="number" id="b11" value="0" min="0" max="255"></label>
-  <label>jeda ms <input type="number" id="gap" value="1" min="1" max="200"></label>
+  <label>jeda ms <input type="number" id="gap" value="3" min="1" max="200"></label>
 </fieldset>
 
 <button id="go">Kirim</button>
@@ -73,12 +73,14 @@ async function open_() {
 
 async function fire(dev, pkts, label, gap) {
   L(`  ${label} — ${pkts.length} paket`, 'hi');
+  let v;
   for (const p of pkts) {
     L('    ' + hex(p.slice(0, 16)));
     await dev.sendFeatureReport(0, p);
     await sleep(gap);
+    try { v = await dev.receiveFeatureReport(0); } catch {}
+    await sleep(gap);
   }
-  const v = await dev.receiveFeatureReport(0);
   const back = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   const ok = hex(back) === hex(pkts[pkts.length - 1]);
   L(`    echo ${ok ? 'COCOK' : 'BEDA: ' + hex(back.slice(0, 16))}`, ok ? 'ok' : 'bad');

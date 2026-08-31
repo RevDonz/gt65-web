@@ -66,8 +66,13 @@ async function open_() {
   return dev;
 }
 async function send(dev, packets, label) {
-  for (const p of packets) { await dev.sendFeatureReport(0, p); await sleep(2); }
-  const v = await dev.receiveFeatureReport(0);
+  let v;
+  for (const p of packets) {
+    await dev.sendFeatureReport(0, p);
+    await sleep(3);
+    try { v = await dev.receiveFeatureReport(0); } catch {}
+    await sleep(3);
+  }
   const back = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   const match = hex(back) === hex(packets[packets.length - 1]);
   L(`  ${label}: ${packets.length} paket terkirim, echo ${match ? 'COCOK' : 'BEDA'}`, match ? 'ok' : 'bad');

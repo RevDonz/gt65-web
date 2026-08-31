@@ -79,7 +79,12 @@ async function applyMode(dev, mode) {
     cmd(0x02),
     cmd(0xf0),
   ];
-  for (const p of pkts) { await dev.sendFeatureReport(0, p); await sleep(2); }
+  for (const p of pkts) {
+    await dev.sendFeatureReport(0, p);
+    await sleep(3);
+    try { await dev.receiveFeatureReport(0); } catch {}
+    await sleep(3);
+  }
 }
 
 document.getElementById('go').onclick = async () => {
