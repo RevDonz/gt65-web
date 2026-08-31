@@ -1,4 +1,5 @@
 import type { Entry } from './protocol';
+import { KEYS } from './layout';
 
 export type Action = { id: string; label: string; entry: Entry };
 
@@ -44,25 +45,81 @@ export const SHORTCUTS: Action[] = [
   { id: 'cut',            label: 'Potong (Ctrl+X)',           entry: { kind: 'key', mod: ctrl, usage: 0x1b } },
 ];
 
-/** Subset HID usage yang bisa dipilih sebagai tombol biasa. */
-export const HID_KEYS: { usage: number; label: string }[] = [
-  ...Array.from({ length: 26 }, (_, i) => ({
-    usage: 0x04 + i, label: String.fromCharCode(65 + i),
-  })),
-  ...Array.from({ length: 9 }, (_, i) => ({
-    usage: 0x1e + i, label: String(i + 1),
-  })),
-  { usage: 0x27, label: '0' },
-  { usage: 0x28, label: 'Enter' },
-  { usage: 0x29, label: 'Esc' },
-  { usage: 0x2a, label: 'Backspace' },
-  { usage: 0x2b, label: 'Tab' },
-  { usage: 0x2c, label: 'Space' },
-  ...Array.from({ length: 12 }, (_, i) => ({
-    usage: 0x3a + i, label: `F${i + 1}`,
-  })),
-  { usage: 0x4f, label: 'Kanan' },
-  { usage: 0x50, label: 'Kiri' },
-  { usage: 0x51, label: 'Bawah' },
-  { usage: 0x52, label: 'Atas' },
-];
+/**
+ * Pemilih tombol biasa DIHASILKAN dari `layout.ts` — bukan daftar tulisan
+ * tangan. Sebelumnya `HID_KEYS` hanya memuat subset yang ditulis manual
+ * (A–Z, 1–9/0, Enter/Esc/Backspace/Tab/Space, F1–F12, empat panah), padahal
+ * `layout.ts` sudah memuat ke-66 tombol fisik keyboard ini beserta usage
+ * HID aslinya. Akibatnya tombol bisa dipetakan MENJADI huruf tapi tidak
+ * bisa dikembalikan ke tanda baca (mis. `;`) — dan pada keyboard yang
+ * tidak bisa dibaca balik serta tanpa perintah reset pabrik, itu pintu
+ * satu arah: satu-satunya jalan keluar adalah cadangan profil yang mungkin
+ * tidak pernah dibuat pengguna.
+ *
+ * Label setiap opsi memakai field `name` dari `layout.ts`, yaitu tulisan
+ * asli di keycap — bukan terjemahan buatan tangan — supaya opsi di
+ * dropdown selalu cocok dengan apa yang tercetak di tombol fisik.
+ *
+ * Papan ini (65%) tidak punya baris F1–F12 maupun Insert/Home/End
+ * sebagai tombol fisik, jadi usage tersebut sengaja TIDAK muncul lagi di
+ * sini — sesuai cakupan `layout.ts`. Lihat laporan tugas untuk detail.
+ */
+const KEY_GROUP_LABELS = {
+  huruf: 'Huruf',
+  angka: 'Angka',
+  simbol: 'Simbol',
+  kontrol: 'Kontrol',
+  navigasi: 'Navigasi',
+  modifier: 'Modifier',
+  lainnya: 'Lainnya',
+} as const;
+
+type KeyGroupId = keyof typeof KEY_GROUP_LABELS;
+
+/** Tombol kontrol/spasi HID standar yang bukan huruf, angka, atau simbol. */
+const CONTROL_USAGES = new Set([0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x39]);
+
+/**
+ * Klasifikasi berdasar rentang usage HID Keyboard/Keypad Page (spec
+ * USB HID Usage Tables §10), bukan lookup per-tombol tulisan tangan —
+ * supaya pengelompokan otomatis mengikuti data `layout.ts`.
+ */
+function classifyUsage(usage: number): KeyGroupId {
+  if (usage >= 0x04 && usage <= 0x1d) return 'huruf';
+  if (usage >= 0x1e && usage <= 0x27) return 'angka';
+  if (usage >= 0x2d && usage <= 0x38) return 'simbol';
+  if (CONTROL_USAGES.has(usage)) return 'kontrol';
+  if (usage >= 0x49 && usage <= 0x52) return 'navigasi';
+  if (usage >= 0xe0 && usage <= 0xe7) return 'modifier';
+  return 'lainnya';
+}
+
+export type KeyGroup = { id: KeyGroupId; label: string; keys: { usage: number; label: string }[] };
+
+/**
+ * Satu opsi per usage DISTINCT di `layout.ts` — sengaja dibangun lewat
+ * `Map` berkunci usage, bukan `KEYS.map()` langsung, supaya dua tombol
+ * fisik dengan usage yang sama (kalaupun suatu saat terjadi) tidak
+ * menghasilkan opsi dropdown ganda. Papan ini kebetulan punya dua tombol
+ * "shift" dan dua "alt", tapi usage HID keduanya berbeda (kiri vs kanan)
+ * sehingga keduanya tetap tampil sebagai opsi terpisah — itu tetap "satu
+ * opsi per usage", bukan pengecualian.
+ */
+const usageToKey = new Map<number, string>();
+for (const k of KEYS) {
+  if (!usageToKey.has(k.usage)) usageToKey.set(k.usage, k.name);
+}
+
+export const HID_KEY_GROUPS: KeyGroup[] = (Object.keys(KEY_GROUP_LABELS) as KeyGroupId[])
+  .map((id) => ({
+    id,
+    label: KEY_GROUP_LABELS[id],
+    keys: [...usageToKey.entries()]
+      .filter(([usage]) => classifyUsage(usage) === id)
+      .sort(([a], [b]) => a - b)
+      .map(([usage, label]) => ({ usage, label })),
+  }))
+  .filter((g) => g.keys.length > 0);
+
+/** Daftar datar semua opsi tombol biasa, untuk pencarian by-usage. */
+export const HID_KEYS: { usage: number; label: string }[] = HID_KEY_GROUPS.flatMap((g) => g.keys);

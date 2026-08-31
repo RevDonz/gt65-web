@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { KeyboardGrid } from '../KeyboardGrid';
-import { MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS } from '../../gt65/keycodes';
+import { MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS } from '../../gt65/keycodes';
 import type { Entry, Layer } from '../../gt65/protocol';
 import type { Profile } from '../../store/profile';
 
@@ -81,8 +81,12 @@ export function RemapPanel({ profile, onChange, onApply }: {
                     }}
                     className="w-full rounded bg-slate-800 px-2 py-1">
               <option value="">— pilih —</option>
-              {HID_KEYS.map((k) => (
-                <option key={k.usage} value={k.usage}>{k.label}</option>
+              {HID_KEY_GROUPS.map((g) => (
+                <optgroup key={g.id} label={g.label}>
+                  {g.keys.map((k) => (
+                    <option key={k.usage} value={k.usage}>{k.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Group>
