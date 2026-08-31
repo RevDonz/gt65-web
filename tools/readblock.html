@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<title>GT65 — coba baca blok tersimpan</title>
+<style>
+  body{font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;margin:0;padding:24px;
+       background:#16151a;color:#ece9f0}
+  h1{font:600 18px/1.3 system-ui,sans-serif;margin:0 0 4px}
+  p.sub{color:#a49eae;font-family:system-ui,sans-serif;margin:0 0 16px;max-width:76ch}
+  button{font:600 13px system-ui,sans-serif;padding:10px 18px;margin:0 8px 12px 0;
+         border:1px solid #e0904f;background:#e0904f;color:#16151a;border-radius:4px;cursor:pointer}
+  button.g{background:#26242c;color:#ece9f0;border-color:#443f4d}
+  #out{white-space:pre;background:#1d1c22;border:1px solid #322f39;border-radius:4px;
+       padding:14px;overflow-x:auto;max-height:70vh;overflow-y:auto;font-size:12px}
+  .ok{color:#4fae9d}.bad{color:#d9686c}.hi{color:#e0904f}
+</style>
+
+<h1>Bisakah blok tersimpan dibaca kembali?</h1>
+<p class="sub">
+Kita sudah tahu <code>receiveFeatureReport(0)</code> mengembalikan gema tulisan
+terakhir. Yang <strong>belum</strong> diuji: apakah membaca berulang setelah
+selektor mengalirkan isi blok keluar potongan demi potongan. Tabel remap 576 byte
+= 9 potongan; kalau bacaan ke-2 dan seterusnya berbeda dari selektornya, berarti
+bisa. Halaman ini hanya mengirim buka-sesi dan selektor — tidak ada paket data,
+tidak ada commit, tidak ada yang tersimpan.
+</p>
+
+<button id="top">Baca layer utama (04 11)</button>
+<button id="light" class="g">Baca pencahayaan (04 13)</button>
+<button id="set" class="g">Baca pengaturan (04 17)</button>
+<div id="out">Belum dijalankan.</div>
+
+<script>
+const out = document.getElementById('out');
+const L = (s = '', c = '') => { const d = document.createElement('div'); if (c) d.className = c; d.textContent = s; out.appendChild(d); };
+const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join(' ');
+function cmd(op, f = {}) { const p = new Uint8Array(64); p[0] = 0x04; p[1] = op; for (const k of Object.keys(f)) p[+k] = f[k]; return p; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function open_() {
+  const ds = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x05ac, productId: 0x024f }] });
+  const dev = ds.find(d => (d.collections ?? []).some(c =>
+    (c.featureReports ?? []).some(r =>
+      (r.items ?? []).reduce((n, it) => n + (it.reportSize ?? 0) * (it.reportCount ?? 0), 0) >= 480)));
+  if (!dev) throw new Error('interface konfigurasi tidak ditemukan');
+  if (!dev.opened) await dev.open();
+  return dev;
+}
+async function read(dev) {
+  const v = await dev.receiveFeatureReport(0);
+  return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+}
+
+async function probe(op, fields, label, reads) {
+  out.textContent = '';
+  let dev;
+  try { dev = await open_(); } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+  try {
+    L(`Selektor 04 ${op.toString(16).padStart(2, '0')} — ${label}`, 'hi');
+    await dev.sendFeatureReport(0, cmd(0x18)); await sleep(3); await read(dev); await sleep(3);
+    const sel = cmd(op, fields);
+    await dev.sendFeatureReport(0, sel); await sleep(3);
+
+    L('');
+    L(`Membaca ${reads} kali berturut-turut tanpa menulis apa pun di antaranya:`);
+    L('');
+    const seen = [];
+    for (let i = 1; i <= reads; i++) {
+      const b = await read(dev);
+      seen.push(hex(b));
+      const sameAsSel = hex(b) === hex(sel);
+      const sameAsPrev = seen.length > 1 && seen[seen.length - 2] === hex(b);
+      let tag = '';
+      if (sameAsSel) tag = ' <- sama dengan selektor';
+      else if (sameAsPrev) tag = ' <- sama dengan bacaan sebelumnya';
+      else tag = ' <- BERBEDA';
+      L(`  baca ${String(i).padStart(2)}: ${hex(b.slice(0, 16))} …${tag}`,
+        tag.includes('BERBEDA') ? 'ok' : '');
+      await sleep(5);
+    }
+
+    const uniq = new Set(seen).size;
+    L('');
+    L('='.repeat(60));
+    if (uniq === 1) {
+      L('SEMUA BACAAN IDENTIK — blok tersimpan tidak bisa dialirkan keluar.', 'bad');
+      L('Aplikasi tetap harus jadi sumber kebenaran.', 'bad');
+    } else {
+      L(`${uniq} bacaan BERBEDA dari ${reads} — ada aliran data!`, 'ok');
+      L('Ini berarti konfigurasi tersimpan bisa dibaca. Kirim seluruh keluaran ini.', 'ok');
+    }
+  } catch (e) { L('ERROR: ' + e.message, 'bad'); }
+  finally { try { await dev.close(); } catch {} }
+}
+
+document.getElementById('top').onclick = () => probe(0x11, { 8: 9 }, 'tabel remap layer utama, 576 byte = 9 potongan', 11);
+document.getElementById('light').onclick = () => probe(0x13, { 8: 1 }, 'blok pencahayaan, 1 potongan', 4);
+document.getElementById('set').onclick = () => probe(0x17, { 8: 1 }, 'blok pengaturan, 1 potongan', 4);
+</script>
