@@ -824,7 +824,10 @@ if (!src) {
 // XML vendor tidak valid pada tombol kutip: name=""" desc="""
 const xml = readFileSync(src, 'utf8').replaceAll('"""', '"&quot;"');
 
-const keys = [...xml.matchAll(/<key\s([^>]*?)\/>/g)].map((m) => {
+// Nilai atribut boleh memuat '>' (tombol `>`), jadi kelas karakter polos
+// [^>] akan menelan tombol itu diam-diam. Perlakukan nilai berkutip sebagai
+// satu kesatuan.
+const keys = [...xml.matchAll(/<key\s+((?:[^">]|"[^"]*")*?)\s*\/>/g)].map((m) => {
   const a = Object.fromEntries(
     [...m[1].matchAll(/(\w+)\s*=\s*"([^"]*)"/g)].map((x) => [x[1], x[2]]),
   );
