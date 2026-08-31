@@ -11,10 +11,13 @@ import { RemapPanel } from './panels/RemapPanel';
 import { LogPanel } from './panels/LogPanel';
 import { TesterPanel } from './panels/TesterPanel';
 import { lighting, settings, remap } from '../gt65/protocol';
+import type { Layer } from '../gt65/protocol';
 import {
   defaultProfile, exportProfile, importProfile, loadProfile, saveProfile,
+  needsOverwriteWarning, promoteProvenance,
 } from '../store/profile';
 import type { Profile } from '../store/profile';
+import { OverwriteGuardModal } from './OverwriteGuardModal';
 
 const TABS = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'] as const;
 type Tab = (typeof TABS)[number];
@@ -85,6 +88,9 @@ export function App() {
   const [profile, setProfileState] = useState<Profile>(loadProfile);
   const [importError, setImportError] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
+  // Layer yang menunggu konfirmasi di OverwriteGuardModal — lihat
+  // handleRemapApply di bawah. `null` berarti modal tertutup.
+  const [pendingRemapLayer, setPendingRemapLayer] = useState<Layer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dev = useDevice(dryRun);
 
@@ -93,10 +99,17 @@ export function App() {
    * manual. localStorage masih salinan utama profil, jadi kegagalan
    * menyimpan berarti suntingan bisa hilang saat halaman dimuat ulang —
    * itu harus terlihat, bukan ditelan diam-diam.
+   *
+   * Ini juga SATU-SATUNYA jalur yang boleh mengubah `profile.provenance`
+   * ke `'edited'` (lewat `promoteProvenance`) — lihat dokumentasinya di
+   * store/profile.ts. Semua panel (Remap, Lampu, Pengaturan), impor
+   * berkas, dan "Pulihkan bawaan" sama-sama memanggil `setProfile`, jadi
+   * panel baru mewarisi pengaman ini tanpa perlu mengingatnya sendiri.
    */
   const setProfile = (p: Profile) => {
-    setProfileState(p);
-    setSaveFailed(!saveProfile(p));
+    const next = promoteProvenance(profile, p);
+    setProfileState(next);
+    setSaveFailed(!saveProfile(next));
   };
 
   const handleExport = () => {
@@ -108,6 +121,29 @@ export function App() {
     a.download = exportFilename(profile.name);
     a.click();
     URL.revokeObjectURL(url);
+    if (!profile.backedUp) setProfile({ ...profile, backedUp: true });
+  };
+
+  const applyRemapLayer = (l: Layer) => dev.send(
+    l === 'top' ? 'Terapkan layer utama' : 'Terapkan layer Fn',
+    remap(l, profile.layers[l]),
+  );
+
+  /**
+   * Gerbang di depan tombol "Terapkan layer ini" di RemapPanel. `remap()`
+   * menulis seluruh 144 slot sekaligus dan keyboard tidak bisa dibaca
+   * balik, jadi kalau profil di browser ini masih bawaan — belum pernah
+   * disunting atau diimpor di sini — aplikasi tidak tahu apa yang sedang
+   * ditimpanya. Hanya remap yang digerbangi (lihat needsOverwriteWarning):
+   * lampu terlihat dan bisa dipulihkan lewat Fn+\` di keyboardnya sendiri,
+   * pengaturan cuma lima boolean.
+   */
+  const handleRemapApply = (l: Layer) => {
+    if (needsOverwriteWarning(profile)) {
+      setPendingRemapLayer(l);
+    } else {
+      void applyRemapLayer(l);
+    }
   };
 
   const handleImportChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +165,11 @@ export function App() {
       <button className="btn" onClick={() => fileInputRef.current?.click()}>Impor</button>
       <RestoreButton onRestore={async () => {
         const d = defaultProfile();
-        setProfile(d);
+        // "Belum pernah dicadangkan" adalah riwayat browser ini (pernah
+        // ekspor/impor atau belum), bukan sifat isi profil — pemulihan
+        // bawaan tidak boleh diam-diam menghidupkan lagi lencana itu kalau
+        // pengguna sudah pernah mencadangkan sebelumnya.
+        setProfile({ ...d, backedUp: profile.backedUp });
         // Satu panggilan berisi empat transaksi: tetap dikirim terpisah
         // dan berurutan, tapi pratinjau mode kering memperlihatkan
         // keempatnya sekaligus.
@@ -151,7 +191,21 @@ export function App() {
       <DeviceBar status={dev.status} error={dev.error} dryRun={dryRun}
                  productName={dev.device?.productName ?? null}
                  onConnect={dev.connect} onToggleDryRun={setDryRun}
-                 actions={profileActions} />
+                 actions={profileActions}
+                 neverBackedUp={!profile.backedUp} onBackup={handleExport} />
+
+      {pendingRemapLayer !== null && (
+        <OverwriteGuardModal
+          onImport={() => { setPendingRemapLayer(null); fileInputRef.current?.click(); }}
+          onCancel={() => setPendingRemapLayer(null)}
+          onProceed={() => {
+            const l = pendingRemapLayer;
+            setPendingRemapLayer(null);
+            setProfile({ ...profile, provenance: 'edited' });
+            void applyRemapLayer(l);
+          }}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         <nav role="tablist" aria-orientation="vertical" aria-label="Panel"
@@ -210,10 +264,7 @@ export function App() {
             <div key={tab} className="panel-swap">
               {tab === 'Remap' && (
                 <RemapPanel profile={profile} onChange={setProfile}
-                            onApply={(l) => dev.send(
-                              l === 'top' ? 'Terapkan layer utama' : 'Terapkan layer Fn',
-                              remap(l, profile.layers[l]),
-                            )} />
+                            onApply={handleRemapApply} />
               )}
               {tab === 'Lampu' && (
                 <LightingPanel profile={profile} onChange={setProfile}

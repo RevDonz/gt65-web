@@ -21,6 +21,7 @@ const LABEL: Record<Status, string> = {
  */
 export function DeviceBar({
   status, error, dryRun, productName, onConnect, onToggleDryRun, actions,
+  neverBackedUp, onBackup,
 }: {
   status: Status;
   error: string | null;
@@ -29,6 +30,9 @@ export function DeviceBar({
   onConnect: () => void;
   onToggleDryRun: (v: boolean) => void;
   actions?: ReactNode;
+  /** Belum pernah ekspor/impor di browser ini — lihat lencana di bawah. */
+  neverBackedUp: boolean;
+  onBackup: () => void;
 }) {
   return (
     <header className="border-b border-[var(--edge)] bg-[var(--panel)]">
@@ -53,6 +57,23 @@ export function DeviceBar({
         <span className="h-5 w-px bg-[var(--edge)]" />
 
         {actions}
+
+        {/*
+          Lencana tenang, bukan alarm: memakai warna warn (kuning), bukan
+          crit (merah) — ini bukan kesalahan, cuma pengingat bahwa belum
+          ada salinan profil di luar browser ini. Bisa diklik langsung
+          untuk mengekspor. Menghilang sendiri setelah ekspor atau impor
+          pertama, jadi tidak menetap di layar orang yang sudah aman.
+        */}
+        {neverBackedUp && (
+          <button type="button" className="pill" onClick={onBackup}
+                  style={{ borderColor: 'var(--warn)', color: 'var(--warn)',
+                           cursor: 'pointer' }}
+                  title="Profil di browser ini belum pernah diekspor atau diimpor — klik untuk mengekspor sekarang.">
+            <span className="dot" style={{ background: 'var(--warn)' }} />
+            Belum pernah dicadangkan
+          </button>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <span className="label">Mode kering</span>

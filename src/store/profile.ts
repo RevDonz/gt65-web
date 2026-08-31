@@ -3,11 +3,26 @@ import type { Entry, Lighting, Settings } from '../gt65/protocol';
 import { KEYS } from '../gt65/layout';
 
 export const STORAGE_KEY = 'gt65.profile';
-const VERSION = 1;
+const VERSION = 2;
+
+/**
+ * Asal-usul profil di browser ini. `'default'` berarti belum pernah
+ * disentuh sama sekali — belum diedit di sini, belum diimpor. Itu satu
+ * momen berbahaya: keyboard tidak bisa dibaca balik, jadi kalau profilnya
+ * masih bawaan, aplikasi ini TIDAK TAHU apa yang sesungguhnya tersimpan di
+ * perangkat (bisa saja pemetaan dari software vendor di komputer lain).
+ * Menerapkan remap saat itu menimpanya tanpa peringatan — lihat
+ * `needsOverwriteWarning`. Begitu diedit atau diimpor, provenance berubah
+ * permanen dan peringatan itu tidak muncul lagi.
+ */
+export type Provenance = 'default' | 'edited' | 'imported';
 
 export type Profile = {
   version: number;
   name: string;
+  provenance: Provenance;
+  /** Sudah pernah diekspor atau diimpor di browser ini — lihat App.tsx. */
+  backedUp: boolean;
   layers: { top: Entry[]; fn: Entry[] };
   lighting: Lighting;
   settings: Settings;
@@ -73,6 +88,8 @@ export function defaultProfile(): Profile {
   return {
     version: VERSION,
     name: 'Bawaan',
+    provenance: 'default',
+    backedUp: false,
     layers: { top, fn: emptyLayer() },
     lighting: { mode: 6, r: 0xff, g: 0xff, b: 0xff,
                 speed: 2, brightness: 2, direction: 0 },
@@ -154,6 +171,13 @@ function parseLighting(v: unknown): Lighting {
   };
 }
 
+function parseProvenance(v: unknown): Provenance {
+  if (v !== 'default' && v !== 'edited' && v !== 'imported') {
+    fail(`Profil rusak: provenance "${String(v)}" tidak dikenal.`);
+  }
+  return v;
+}
+
 function parseSettings(v: unknown): Settings {
   if (typeof v !== 'object' || v === null) {
     fail('Profil rusak: blok pengaturan tidak ada.');
@@ -191,6 +215,9 @@ export function parseProfile(v: unknown): Profile {
   if (typeof p.name !== 'string') {
     fail('Profil rusak: nama profil bukan teks.');
   }
+  if (typeof p.backedUp !== 'boolean') {
+    fail('Profil rusak: status cadangan bukan boolean.');
+  }
   if (typeof p.layers !== 'object' || p.layers === null) {
     fail('Profil rusak: blok layer tidak ada.');
   }
@@ -198,6 +225,8 @@ export function parseProfile(v: unknown): Profile {
   return {
     version: VERSION,
     name: p.name,
+    provenance: parseProvenance(p.provenance),
+    backedUp: p.backedUp,
     layers: {
       top: parseLayer(layers.top, 'utama'),
       fn: parseLayer(layers.fn, 'Fn'),
@@ -237,6 +266,16 @@ export function exportProfile(p: Profile): string {
   return JSON.stringify(p, null, 2);
 }
 
+/**
+ * Berkas yang diimpor selalu menjadi provenance `'imported'`, apa pun nilai
+ * provenance yang tersimpan di dalam berkasnya sendiri — bahkan kalau
+ * isinya kebetulan identik dengan `defaultProfile()`. Titik baliknya
+ * adalah TINDAKAN mengimpor, bukan isi berkasnya: begitu pengguna memilih
+ * berkas secara sadar, profil di browser ini bukan lagi "belum pernah
+ * disentuh". `parseProfile` sendiri tidak melakukan penimpaan ini karena ia
+ * juga dipakai `loadProfile` untuk localStorage, yang provenance-nya harus
+ * bertahan apa adanya lintas muat ulang halaman.
+ */
 export function importProfile(json: string): Profile {
   let raw: unknown;
   try {
@@ -244,5 +283,53 @@ export function importProfile(json: string): Profile {
   } catch {
     fail('Berkas ini bukan JSON yang sah.');
   }
-  return parseProfile(raw);
+  const p = parseProfile(raw);
+  return { ...p, provenance: 'imported', backedUp: true };
+}
+
+// --- Pengaman menimpa konfigurasi tak terlihat -----------------------------
+
+function sameContent(a: Profile, b: Profile): boolean {
+  return JSON.stringify(a.layers) === JSON.stringify(b.layers)
+      && JSON.stringify(a.lighting) === JSON.stringify(b.lighting)
+      && JSON.stringify(a.settings) === JSON.stringify(b.settings);
+}
+
+/**
+ * Titik tumpu TUNGGAL promosi provenance ke `'edited'`. Dipanggil oleh
+ * pembungkus `setProfile` di App.tsx untuk SETIAP perubahan profil, apa pun
+ * sumbernya (panel remap/lampu/pengaturan, impor berkas, atau "Pulihkan
+ * bawaan") — supaya panel baru di masa depan tidak bisa lupa menandai
+ * suntingannya sendiri seperti yang harus dilakukan lima panel kalau
+ * pemeriksaan ini disebar ke tiap `onChange`.
+ *
+ * Hanya menaikkan ke `'edited'` saat KEDUA provenance — lama maupun baru —
+ * masih `'default'` dan isinya (layer/lighting/settings) benar-benar
+ * berbeda. Panel menyalin `profile` lama apa adanya (`{...profile, ...}`)
+ * sehingga provenance ikut terbawa tanpa diubah; import dan "Pulihkan
+ * bawaan" selalu menyatakan provenance mereka sendiri secara eksplisit
+ * (`'imported'`/`'default'`) sehingga tidak pernah masuk cabang ini —
+ * import tetap `'imported'`, dan pemulihan bawaan tetap `'default'` (benar:
+ * setelah dipulihkan, profilnya sungguh-sungguh identik dengan bawaan
+ * pabrik lagi).
+ */
+export function promoteProvenance(prev: Profile, next: Profile): Profile {
+  if (prev.provenance === 'default' && next.provenance === 'default'
+      && !sameContent(prev, next)) {
+    return { ...next, provenance: 'edited' };
+  }
+  return next;
+}
+
+/**
+ * Satu-satunya pertanyaan yang harus dijawab sebelum menerapkan remap:
+ * apakah profil di browser ini masih bawaan yang belum pernah disentuh?
+ * Kalau ya, keyboard mungkin masih menyimpan pemetaan tombol dari komputer
+ * lain yang tidak bisa dibaca ulang — menerapkan remap akan menimpanya
+ * tanpa jejak (lihat insiden di App.tsx). Dipisah sebagai fungsi murni
+ * supaya bisa diuji tanpa merender modalnya, mengikuti pola `sendDecision`
+ * di useDevice.ts.
+ */
+export function needsOverwriteWarning(profile: Profile): boolean {
+  return profile.provenance === 'default';
 }

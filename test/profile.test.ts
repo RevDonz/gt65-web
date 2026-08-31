@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { defaultProfile, loadProfile, saveProfile,
-         exportProfile, importProfile } from '../src/store/profile';
+         exportProfile, importProfile, promoteProvenance,
+         needsOverwriteWarning } from '../src/store/profile';
 import { KEYS } from '../src/gt65/layout';
 import { TABLE_ENTRIES, lighting } from '../src/gt65/protocol';
 
@@ -51,6 +52,79 @@ describe('profil bawaan', () => {
   });
 });
 
+/**
+ * Provenance adalah pengaman inti tugas ini: `'default'` berarti profil di
+ * browser ini belum pernah disentuh, jadi menerapkan remap saat itu bisa
+ * menimpa pemetaan dari komputer lain tanpa peringatan (keyboard tidak
+ * bisa dibaca balik). Lihat needsOverwriteWarning dan promoteProvenance.
+ */
+describe('provenance', () => {
+  test('profil bawaan berprovenance "default" dan belum pernah dicadangkan', () => {
+    const p = defaultProfile();
+    expect(p.provenance).toBe('default');
+    expect(p.backedUp).toBe(false);
+  });
+
+  test('impor selalu berprovenance "imported" dan tercadangkan', () => {
+    const p = importProfile(exportProfile(defaultProfile()));
+    expect(p.provenance).toBe('imported');
+    expect(p.backedUp).toBe(true);
+  });
+
+  describe('promoteProvenance — titik tumpu tunggal ke "edited"', () => {
+    test('menaikkan ke "edited" saat layer berubah dari profil bawaan', () => {
+      const prev = defaultProfile();
+      const idx = KEYS[0].keyIndex;
+      const next = { ...prev, layers: { ...prev.layers,
+        top: prev.layers.top.map((e, i) => (i === idx ? { kind: 'none' as const } : e)) } };
+      expect(promoteProvenance(prev, next).provenance).toBe('edited');
+    });
+
+    test('menaikkan ke "edited" saat lighting atau settings berubah', () => {
+      const prev = defaultProfile();
+      const nextLighting = { ...prev, lighting: { ...prev.lighting, r: 0x01 } };
+      expect(promoteProvenance(prev, nextLighting).provenance).toBe('edited');
+
+      const nextSettings = { ...prev,
+        settings: { ...prev.settings, sleepTimeout: 5 } };
+      expect(promoteProvenance(prev, nextSettings).provenance).toBe('edited');
+    });
+
+    test('tidak menaikkan kalau isinya tidak berubah (mis. hanya menandai cadangan)', () => {
+      const prev = defaultProfile();
+      const next = { ...prev, backedUp: true };
+      expect(promoteProvenance(prev, next).provenance).toBe('default');
+    });
+
+    test('tidak menaikkan lagi profil yang sudah "edited" atau "imported"', () => {
+      const editedPrev = { ...defaultProfile(), provenance: 'edited' as const };
+      const editedNext = { ...editedPrev,
+        lighting: { ...editedPrev.lighting, r: 0x02 } };
+      expect(promoteProvenance(editedPrev, editedNext).provenance).toBe('edited');
+
+      const importedPrev = { ...defaultProfile(), provenance: 'imported' as const };
+      expect(promoteProvenance(importedPrev, importedPrev).provenance).toBe('imported');
+    });
+
+    test('impor dan "Pulihkan bawaan" menyatakan provenance sendiri, tidak diubah', () => {
+      const prev = { ...defaultProfile(), provenance: 'edited' as const };
+      const imported = { ...defaultProfile(), provenance: 'imported' as const };
+      expect(promoteProvenance(prev, imported).provenance).toBe('imported');
+
+      const restored = defaultProfile(); // provenance 'default', sama seperti prev.provenance lama
+      expect(promoteProvenance(prev, restored).provenance).toBe('default');
+    });
+  });
+
+  describe('needsOverwriteWarning', () => {
+    test('true hanya untuk provenance "default"', () => {
+      expect(needsOverwriteWarning(defaultProfile())).toBe(true);
+      expect(needsOverwriteWarning({ ...defaultProfile(), provenance: 'edited' })).toBe(false);
+      expect(needsOverwriteWarning({ ...defaultProfile(), provenance: 'imported' })).toBe(false);
+    });
+  });
+});
+
 describe('persistensi', () => {
   test('menyimpan lalu memuat kembali profil yang sama', () => {
     const p = defaultProfile();
@@ -90,8 +164,15 @@ describe('validasi profil', () => {
   const valid = () => JSON.parse(exportProfile(defaultProfile()));
   const imp = (p: unknown) => () => importProfile(JSON.stringify(p));
 
-  test('menerima profil bawaan apa adanya', () => {
-    expect(imp(valid())()).toEqual(defaultProfile());
+  /**
+   * Impor selalu menandai provenance `'imported'`, bahkan kalau isi
+   * berkasnya kebetulan identik dengan profil bawaan — titik baliknya
+   * adalah tindakan mengimpor, bukan isi berkasnya. Lihat `importProfile`
+   * di store/profile.ts.
+   */
+  test('menerima profil bawaan apa adanya, tapi menandainya sebagai impor', () => {
+    expect(imp(valid())()).toEqual(
+      { ...defaultProfile(), provenance: 'imported', backedUp: true });
   });
 
   test('menolak berkas yang bukan JSON', () => {
@@ -270,6 +351,26 @@ describe('loadProfile jatuh ke bawaan, bukan crash', () => {
     const p = valid();
     p.layers.top[3] = { kind: 'peledak' };
     store(p);
+    expect(loadProfile()).toEqual(defaultProfile());
+  });
+
+  /**
+   * Profil tersimpan dari VERSION sebelumnya (sebelum provenance/backedUp
+   * ada) tidak boleh dibaca dengan field yang hilang — itu membuat
+   * `needsOverwriteWarning` salah baca `undefined` sebagai bukan 'default'
+   * dan melewatkan peringatan padahal profilnya sesungguhnya belum pernah
+   * disentuh di versi baru ini. VERSION yang dinaikkan membuat seluruh
+   * profil versi lama gagal validasi bersama-sama, jatuh bersih ke bawaan.
+   */
+  test('profil dari VERSION sebelumnya (tanpa provenance/backedUp) jatuh ke bawaan', () => {
+    store({
+      version: 1,
+      name: 'Lama',
+      layers: valid().layers,
+      lighting: valid().lighting,
+      settings: valid().settings,
+      // provenance dan backedUp sengaja tidak ada — bentuk skema lama.
+    });
     expect(loadProfile()).toEqual(defaultProfile());
   });
 });

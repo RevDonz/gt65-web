@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '../src/app/App';
@@ -7,6 +7,11 @@ import { KEYS } from '../src/gt65/layout';
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
+
+// Setiap mountApp() memuat profil dari localStorage — kalau satu tes
+// menyunting profil (mis. mengonfirmasi peringatan menimpa), tes berikutnya
+// di file ini tidak boleh mewarisi provenance-nya secara diam-diam.
+beforeEach(() => localStorage.clear());
 
 async function mountApp() {
   const el = document.createElement('div');
@@ -121,6 +126,75 @@ describe('tab Remap', () => {
     const { el, clickTab, cleanup } = await mountApp();
     await clickTab('Tester');
     expect(el.querySelectorAll('.kc[data-locked="true"]').length).toBe(0);
+    await cleanup();
+  });
+});
+
+/**
+ * Wiring App.tsx untuk OverwriteGuardModal. `needsOverwriteWarning` dan
+ * `promoteProvenance` sudah diuji murni di profile.test.ts; tes di sini
+ * memastikan App.tsx betul-betul memanggilnya di jalur "Terapkan layer
+ * ini" — satu-satunya tempat insiden nyatanya terjadi.
+ */
+describe('pengaman menimpa konfigurasi tak terlihat', () => {
+  const clickButton = (el: Element, text: string) => {
+    const btn = [...el.querySelectorAll('button')].find((b) => b.textContent === text);
+    if (!btn) throw new Error(`tombol "${text}" tidak ditemukan`);
+    return act(async () => { (btn as HTMLButtonElement).click(); });
+  };
+
+  test('menampilkan modal saat menerapkan remap dari profil bawaan yang belum disentuh', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+
+    await clickButton(el, 'Terapkan layer ini');
+
+    const dialog = el.querySelector('[role="alertdialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.textContent).toContain('tidak bisa membacanya');
+    expect(dialog!.textContent).toContain('menghapus pemetaan itu secara permanen');
+    await cleanup();
+  });
+
+  test('"Batal" menutup modal tanpa menerapkan apa pun', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await clickButton(el, 'Terapkan layer ini');
+    expect(el.querySelector('[role="alertdialog"]')).not.toBeNull();
+
+    await clickButton(el, 'Batal');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(el.textContent).not.toContain('Paket terakhir');
+    await cleanup();
+  });
+
+  test('"Lanjutkan, saya mulai dari nol" menerapkan dan tidak menampilkan modal lagi', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await clickButton(el, 'Terapkan layer ini');
+
+    await clickButton(el, 'Lanjutkan, saya mulai dari nol');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    // Mode kering aktif secara bawaan: paket tetap dibentuk dan ditampilkan
+    // sebagai pratinjau meski tidak sungguh ditulis ke perangkat.
+    expect(el.textContent).toContain('Paket terakhir');
+
+    // Provenance sudah 'edited' — permintaan kedua tidak boleh menampilkan
+    // modal lagi.
+    await clickButton(el, 'Terapkan layer ini');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    await cleanup();
+  });
+
+  test('"Impor cadangan" menutup modal tanpa menerapkan', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await clickButton(el, 'Terapkan layer ini');
+
+    await clickButton(el, 'Impor cadangan');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(el.textContent).not.toContain('Paket terakhir');
     await cleanup();
   });
 });
