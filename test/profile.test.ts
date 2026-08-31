@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { defaultProfile, loadProfile, saveProfile,
          exportProfile, importProfile } from '../src/store/profile';
 import { KEYS } from '../src/gt65/layout';
-import { TABLE_ENTRIES } from '../src/gt65/protocol';
+import { TABLE_ENTRIES, lighting } from '../src/gt65/protocol';
 
 beforeEach(() => localStorage.clear());
 
@@ -27,6 +27,27 @@ describe('profil bawaan', () => {
     for (let i = 0; i < TABLE_ENTRIES; i++) {
       if (!used.has(i)) expect(p.layers.top[i]).toEqual({ kind: 'none' });
     }
+  });
+
+  /**
+   * Paket emas jalur pemulihan. `defaultProfile()` adalah apa yang ditulis
+   * saat pengguna menekan "Pulihkan bawaan" — satu-satunya jalan keluar
+   * ketika keyboard salah konfigurasi, karena tidak ada perintah
+   * factory-reset di firmware ini. Rentang kabel yang sah adalah 1..5
+   * (speed_max/brightness_max di rgb-keyboard.xml vendor); hanya wire byte
+   * 3 yang terbukti langsung di hardware fisik. Kalau tes ini gagal, jalur
+   * pemulihan itu sendiri akan mengirim byte yang ditolak keyboard dan
+   * mematikan lampunya — persis kegagalan yang diperbaiki di sini.
+   */
+  test('pencahayaan bawaan ter-encode ke wire byte dalam rentang 1..5', () => {
+    const d = lighting(defaultProfile().lighting)[2];
+    expect(d[9]).toBeGreaterThanOrEqual(1);
+    expect(d[9]).toBeLessThanOrEqual(5);
+    expect(d[10]).toBeGreaterThanOrEqual(1);
+    expect(d[10]).toBeLessThanOrEqual(5);
+    // Nilai spesifik yang terbukti di hardware sungguhan (2026-08-31).
+    expect(d[9]).toBe(3);
+    expect(d[10]).toBe(3);
   });
 });
 

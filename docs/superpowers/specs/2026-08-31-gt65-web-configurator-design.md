@@ -210,6 +210,32 @@ kiri-ke-kanan; nilai `1` dan `2` beranimasi kanan-ke-kiri. UI mengekspos
 keempatnya sebagai pilihan berlabel (bukan angka mentah), memakai perilaku
 yang teramati ini sebagai labelnya.
 
+**TERKONFIRMASI SEBAGIAN (2026-08-31): rentang wire byte `speed`/`brightness`
+yang sah adalah 1 sampai 5, tapi baru wire byte 3 yang dibuktikan langsung di
+hardware.** Dua sumber, dua tingkat kepastian:
+
+1. *Langsung di hardware (dikonfirmasi):* pengguna mengonfirmasi lampu
+   menyala benar memakai wire byte `3` untuk speed maupun brightness —
+   dikirim lewat halaman diagnostik yang menulis byte mentah tanpa `+1`.
+2. *Analisis statis driver vendor (didokumentasikan, belum diuji ujungnya):*
+   driver vendor yang lebih baru mendeklarasikan `speed_max=5` dan
+   `brightness_max=5` di `rgb-keyboard.xml`, artinya rentang wire yang sah
+   adalah 1..5. Ujung atas rentang ini (wire 5) belum pernah diuji langsung
+   di unit ini.
+
+Sebelumnya `defaultProfile()` mengirim `speed: 7, brightness: 7` — dengan
+`lighting()` menaikkan value+1, itu jadi wire byte `8`, di luar rentang 1..5
+manapun. Karena `defaultProfile()` adalah jalur pemulihan ("Pulihkan
+bawaan") dan keyboard ini tidak punya perintah factory-reset, nilai
+di luar rentang di sana berarti tombol yang seharusnya menyelamatkan
+pengguna justru mematikan lampu mereka. Nilai bawaan sekarang `speed: 2,
+brightness: 2` (wire byte 3 — nilai yang terbukti di hardware, bukan
+titik tengah rentang UI), dan `LightingPanel` membatasi kedua field ke
+UI 0..4 (wire 1..5) supaya pengguna tidak bisa memilih di luar rentang
+yang didokumentasikan vendor. `lighting()` sendiri sengaja tidak memotong
+nilai — pembatasan itu murni tanggung jawab UI, sesuai prinsip lapisan
+protokol yang jujur (lihat catatan di `test/protocol.test.ts`).
+
 **Masih belum pasti: mode mana saja yang benar-benar dipengaruhi warna RGB.**
 Saat menguji dengan warna kuning, pengamat tidak bisa memastikan mode mana
 yang benar-benar menerapkan warna itu — kemungkinan sebagian mode (terutama

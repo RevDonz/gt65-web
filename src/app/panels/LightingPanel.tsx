@@ -98,16 +98,27 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
                }} />
       </label>
 
+      <p className="-mt-2 rounded border border-slate-700 bg-slate-800/40 p-2
+                    text-xs text-slate-300">
+        Kecepatan dan kecerahan dibatasi 0-4 (byte kabel 1-5). Batas atas ini
+        berasal dari <code>rgb-keyboard.xml</code> vendor (<code>speed_max=5</code>,
+        <code>brightness_max=5</code>) — ini batas yang didokumentasikan
+        vendor, bukan yang sudah diuji langsung di unit ini. Yang terbukti
+        langsung di hardware baru nilai UI 2 (byte kabel 3); lihat tombol
+        &quot;Kirim nilai vendor (referensi)&quot; di bawah untuk titik lain
+        yang juga terbukti.
+      </p>
+
       <label className="flex items-center justify-between gap-4">
         Kecepatan (payload[10])
-        <input type="number" min={0} max={15} value={l.speed}
+        <input type="number" min={0} max={4} value={l.speed}
                onChange={(e) => set({ speed: Number(e.target.value) })}
                className="w-24 rounded bg-slate-800 px-2 py-1" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
         Kecerahan (payload[9])
-        <input type="number" min={0} max={15} value={l.brightness}
+        <input type="number" min={0} max={4} value={l.brightness}
                onChange={(e) => set({ brightness: Number(e.target.value) })}
                className="w-24 rounded bg-slate-800 px-2 py-1" />
       </label>

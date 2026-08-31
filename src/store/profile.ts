@@ -52,9 +52,15 @@ function emptyLayer(): Entry[] {
  * mode 6 ("Breath") ada di rentang 1..19 yang terbukti menyalakan lampu
  * (0, 20, 21 terbukti tidak menyalakan apa pun); payload[9] terbukti
  * kecerahan dan payload[10] terbukti kecepatan (kebalikan dari dugaan
- * awal berdasar urutan field di disassembly). Nilai 7 untuk speed/
- * brightness adalah titik tengah rentang UI 0-15, dipilih sebagai bawaan
- * yang wajar, bukan hasil pengukuran spesifik.
+ * awal berdasar urutan field di disassembly). Nilai 2 untuk speed/
+ * brightness DIPILIH KARENA, bukan meski, `lighting()` mengirim value+1:
+ * itu menghasilkan wire byte 3, satu-satunya nilai yang terbukti langsung
+ * di perangkat fisik (halaman diagnostik mengirim byte mentah tanpa +1).
+ * Ini BUKAN titik tengah rentang UI — ini jalur pemulihan ("Pulihkan
+ * bawaan"), satu-satunya tombol yang tersedia saat keyboard salah
+ * konfigurasi dan tidak ada perintah factory-reset. Nilai di luar rentang
+ * kabel 1..5 (lihat rgb-keyboard.xml vendor: speed_max=5, brightness_max=5)
+ * akan membuat tombol penyelamat ini justru mematikan lampu.
  *
  * Yang BELUM DIPASTIKAN: mode mana saja yang benar-benar dipengaruhi oleh
  * `r`/`g`/`b` — lihat catatan di LightingPanel.
@@ -69,7 +75,7 @@ export function defaultProfile(): Profile {
     name: 'Bawaan',
     layers: { top, fn: emptyLayer() },
     lighting: { mode: 6, r: 0xff, g: 0xff, b: 0xff,
-                speed: 7, brightness: 7, direction: 0 },
+                speed: 2, brightness: 2, direction: 0 },
     settings: { flags: [false, false, false, false, false], sleepTimeout: 0 },
   };
 }
