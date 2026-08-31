@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<title>GT65 — uji pencahayaan per-tombol</title>
+<style>
+  body{font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;margin:0;padding:24px;
+       background:#12171d;color:#e6ebf0}
+  h1{font:600 18px/1.3 system-ui,sans-serif;margin:0 0 4px}
+  p.sub{color:#7b8794;font-family:system-ui,sans-serif;margin:0 0 18px;max-width:74ch}
+  button{font:600 13px system-ui,sans-serif;padding:10px 16px;margin:0 8px 14px 0;
+         border:1px solid #3a4653;background:#212932;color:#e6ebf0;border-radius:4px;cursor:pointer}
+  button.p{background:#e0904f;color:#12171d;border-color:#e0904f}
+  #out{white-space:pre-wrap;background:#191f26;border:1px solid #2b343e;border-radius:4px;
+       padding:16px;overflow-x:auto;min-height:100px}
+  .ok{color:#4fae9d}.bad{color:#d9686c}.hi{color:#e0904f}
+</style>
+
+<h1>Uji pencahayaan per-tombol GT65</h1>
+<p class="sub">
+Meniru alur lengkap vendor: kirim 192 byte warna per-LED lewat selektor
+<code>04 23</code>, lalu aktifkan mode <code>0x80</code> lewat <code>04 13</code>
+dengan speed/brightness dipatok <code>0f 0f</code>. Hanya menyentuh pencahayaan —
+tidak ada remap, tidak ada pengaturan.
+</p>
+
+<button class="p" id="perkey">1 · Semua LED merah (mode per-tombol)</button>
+<button id="white">2 · Semua LED putih</button>
+<button id="builtin">3 · Kembali ke efek bawaan (mode 0x0b)</button>
+<div id="out">Belum dijalankan.</div>
+
+<script>
+const out = document.getElementById('out');
+const L = (s = '', c = '') => { const d = document.createElement('div'); if (c) d.className = c; d.textContent = s; out.appendChild(d); };
+const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+function cmd(op, fields = {}) {
+  const p = new Uint8Array(64);
+  p[0] = 0x04; p[1] = op;
+  for (const k of Object.keys(fields)) p[Number(k)] = fields[k];
+  return p;
+}
+function dataPkt(fields, termAt) {
+  const p = new Uint8Array(64);
+  for (const k of Object.keys(fields)) p[Number(k)] = fields[k];
+  p[termAt] = 0xaa; p[termAt + 1] = 0x55;
+  return p;
+}
+function chunks(buf) {
+  const out = [];
+  for (let i = 0; i < buf.length; i += 64) {
+    const c = new Uint8Array(64);
+    c.set(buf.subarray(i, i + 64));
+    out.push(c);
+  }
+  return out;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function open_() {
+  const ds = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x05ac, productId: 0x024f }] });
+  const dev = ds.find(d => (d.collections ?? []).some(c =>
+    (c.featureReports ?? []).some(r =>
+      (r.items ?? []).reduce((n, it) => n + (it.reportSize ?? 0) * (it.reportCount ?? 0), 0) >= 480)));
+  if (!dev) throw new Error('interface konfigurasi tidak ditemukan');
+  if (!dev.opened) await dev.open();
+  return dev;
+}
+async function send(dev, packets, label) {
+  for (const p of packets) { await dev.sendFeatureReport(0, p); await sleep(2); }
+  const v = await dev.receiveFeatureReport(0);
+  const back = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+  const match = hex(back) === hex(packets[packets.length - 1]);
+  L(`  ${label}: ${packets.length} paket terkirim, echo ${match ? 'COCOK' : 'BEDA'}`, match ? 'ok' : 'bad');
+  if (!match) L('    echo: ' + hex(back.slice(0, 16)) + ' …');
+}
+
+// 192 byte = 64 LED x RGB
+function frame(r, g, b) {
+  const f = new Uint8Array(192);
+  for (let i = 0; i < 64; i++) { f[i * 3] = r; f[i * 3 + 1] = g; f[i * 3 + 2] = b; }
+  return f;
+}
+
+async function perKey(r, g, b, name) {
+  out.textContent = '';
+  let dev;
+  try { dev = await open_(); } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+  try {
+    L(`LANGKAH 1 — kirim 192 byte warna per-LED (${name})`, 'hi');
+    await send(dev, [cmd(0x18), cmd(0x23), ...chunks(frame(r, g, b)), cmd(0x02), cmd(0xf0)], '04 23');
+
+    L('', '');
+    L('LANGKAH 2 — aktifkan mode 0x80', 'hi');
+    await send(dev, [
+      cmd(0x18),
+      cmd(0x13, { 8: 1 }),
+      dataPkt({ 0: 0x80, 1: r, 2: g, 3: b, 8: 1, 9: 0x0f, 10: 0x0f, 11: 0 }, 14),
+      cmd(0x02), cmd(0xf0),
+    ], '04 13 mode 0x80');
+
+    L('', '');
+    L('Selesai. Lihat keyboardnya.', 'ok');
+  } catch (e) { L('ERROR: ' + e.message, 'bad'); }
+  finally { try { await dev.close(); } catch {} }
+}
+
+document.getElementById('perkey').onclick = () => perKey(0xff, 0x00, 0x00, 'merah');
+document.getElementById('white').onclick = () => perKey(0xff, 0xff, 0xff, 'putih');
+
+document.getElementById('builtin').onclick = async () => {
+  out.textContent = '';
+  let dev;
+  try { dev = await open_(); } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+  try {
+    L('Kembalikan efek bawaan: mode 0x0b, merah, 10 0b', 'hi');
+    await send(dev, [
+      cmd(0x18),
+      cmd(0x13, { 8: 1 }),
+      dataPkt({ 0: 0x0b, 1: 0xff, 2: 0, 3: 0, 8: 1, 9: 0x10, 10: 0x0b, 11: 0 }, 14),
+      cmd(0x02), cmd(0xf0),
+    ], '04 13 mode 0x0b');
+  } catch (e) { L('ERROR: ' + e.message, 'bad'); }
+  finally { try { await dev.close(); } catch {} }
+};
+</script>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<title>GT65 — sapu nilai mode</title>
+<style>
+  body{font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;margin:0;padding:24px;
+       background:#12171d;color:#e6ebf0}
+  h1{font:600 18px/1.3 system-ui,sans-serif;margin:0 0 4px}
+  p.sub{color:#7b8794;font-family:system-ui,sans-serif;margin:0 0 18px;max-width:74ch}
+  button{font:600 13px system-ui,sans-serif;padding:10px 16px;margin:0 8px 14px 0;
+         border:1px solid #3a4653;background:#212932;color:#e6ebf0;border-radius:4px;cursor:pointer}
+  button.p{background:#e0904f;color:#12171d;border-color:#e0904f}
+  button.s{background:#d9686c;color:#12171d;border-color:#d9686c}
+  #now{font:700 64px/1.1 ui-monospace,monospace;color:#e0904f;margin:10px 0;text-align:center}
+  #sub{text-align:center;color:#7b8794;font-family:system-ui,sans-serif;margin-bottom:16px}
+  #out{white-space:pre-wrap;background:#191f26;border:1px solid #2b343e;border-radius:4px;
+       padding:14px;overflow-x:auto;max-height:260px;overflow-y:auto}
+  .ok{color:#4fae9d}.bad{color:#d9686c}
+  label{font-family:system-ui,sans-serif;margin-right:14px}
+  input[type=number]{width:70px;background:#212932;color:#e6ebf0;border:1px solid #3a4653;
+                     border-radius:3px;padding:4px 6px;font-family:inherit}
+</style>
+
+<h1>Sapu nilai mode pencahayaan</h1>
+<p class="sub">
+Mengirim paket lampu berulang dengan <code>payload[0]</code> dinaikkan satu per satu,
+dengan byte[9] dan byte[10] yang bisa Anda atur, dan warna merah penuh.
+Manual menyebut keyboard ini punya <strong>18 mode</strong>, jadi mulai dari rentang kecil.
+Kalau kacau, tekan <code>Fn + \</code> di keyboard untuk memulihkan. Perhatikan keyboardnya — begitu ada cahaya, tekan STOP dan
+catat angka besar yang sedang tampil.
+</p>
+
+<div>
+  <label>dari <input type="number" id="from" value="0" min="0" max="255"></label>
+  <label>sampai <input type="number" id="to" value="31" min="0" max="255"></label>
+  <label>jeda ms <input type="number" id="gap" value="400" min="80" max="3000"></label>
+  <label>byte[8] colortype <input type="number" id="b8" value="0" min="0" max="255"></label>
+  <label>byte[9] <input type="number" id="b9" value="3" min="0" max="255"></label>
+  <label>byte[10] <input type="number" id="b10" value="3" min="0" max="255"></label>
+</div>
+
+<button class="p" id="go">Mulai sapu</button>
+<button class="s" id="stop">STOP</button>
+<button id="off">Matikan semua (uji balik)</button>
+
+<div id="now">—</div>
+<div id="sub">belum berjalan</div>
+<div id="out"></div>
+
+<script>
+const out = document.getElementById('out');
+const now = document.getElementById('now');
+const sub = document.getElementById('sub');
+const L = (s, c = '') => { const d = document.createElement('div'); if (c) d.className = c; d.textContent = s; out.prepend(d); };
+let stop = false;
+
+function cmd(op, f = {}) { const p = new Uint8Array(64); p[0] = 0x04; p[1] = op; for (const k of Object.keys(f)) p[+k] = f[k]; return p; }
+function dataPkt(f, t) { const p = new Uint8Array(64); for (const k of Object.keys(f)) p[+k] = f[k]; p[t] = 0xaa; p[t + 1] = 0x55; return p; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function open_() {
+  const ds = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x05ac, productId: 0x024f }] });
+  const dev = ds.find(d => (d.collections ?? []).some(c =>
+    (c.featureReports ?? []).some(r =>
+      (r.items ?? []).reduce((n, it) => n + (it.reportSize ?? 0) * (it.reportCount ?? 0), 0) >= 480)));
+  if (!dev) throw new Error('interface konfigurasi tidak ditemukan');
+  if (!dev.opened) await dev.open();
+  return dev;
+}
+
+async function applyMode(dev, mode) {
+  const pkts = [
+    cmd(0x18),
+    cmd(0x13, { 8: 1 }),
+    dataPkt({ 0: mode, 1: 0xff, 2: 0x00, 3: 0x00,
+               8: +document.getElementById('b8').value,
+               9: +document.getElementById('b9').value,
+               10: +document.getElementById('b10').value, 11: 0 }, 14),
+    cmd(0x02),
+    cmd(0xf0),
+  ];
+  for (const p of pkts) { await dev.sendFeatureReport(0, p); await sleep(2); }
+}
+
+document.getElementById('go').onclick = async () => {
+  stop = false;
+  out.textContent = '';
+  const a = +document.getElementById('from').value;
+  const b = +document.getElementById('to').value;
+  const gap = +document.getElementById('gap').value;
+  let dev;
+  try { dev = await open_(); } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+  L(`Menyapu payload[0] = ${a} … ${b}, jeda ${gap} ms`, 'ok');
+  try {
+    for (let m = a; m <= b && !stop; m++) {
+      now.textContent = m;
+      sub.textContent = `payload[0] = ${m} (0x${m.toString(16).padStart(2, '0')})`;
+      await applyMode(dev, m);
+      await sleep(gap);
+    }
+    L(stop ? `DIHENTIKAN di ${now.textContent}` : 'Sapu selesai tanpa dihentikan.', stop ? 'ok' : 'bad');
+  } catch (e) {
+    L('ERROR di nilai ' + now.textContent + ': ' + e.message, 'bad');
+  } finally { try { await dev.close(); } catch {} }
+};
+
+document.getElementById('stop').onclick = () => { stop = true; sub.textContent = 'dihentikan'; };
+
+document.getElementById('off').onclick = async () => {
+  let dev;
+  try { dev = await open_(); } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+  try {
+    await applyMode(dev, 0);
+    L('Dikirim mode 0 dengan merah penuh — kalau ini pun gelap, tidak ada mode yang menyala.', 'ok');
+  } finally { try { await dev.close(); } catch {} }
+};
+</script>

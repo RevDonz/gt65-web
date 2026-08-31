@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<title>GT65 — pemetaan read-back</title>
+<style>
+  body{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:0;padding:24px;
+       background:#12171d;color:#e6ebf0}
+  h1{font:600 18px/1.3 system-ui,sans-serif;margin:0 0 4px}
+  p.sub{color:#7b8794;font-family:system-ui,sans-serif;margin:0 0 18px;max-width:70ch}
+  button{font:600 13px system-ui,sans-serif;padding:9px 16px;margin:0 8px 14px 0;
+         border:1px solid #3a4653;background:#e0904f;color:#12171d;border-radius:4px;cursor:pointer}
+  #out{white-space:pre;background:#191f26;border:1px solid #2b343e;border-radius:4px;
+       padding:16px;overflow-x:auto;min-height:120px}
+  .ok{color:#4fae9d}.bad{color:#d9686c}.warn{color:#d0a54a}.hi{color:#e0904f}
+</style>
+
+<h1>Pemetaan read-back GT65</h1>
+<p class="sub">
+Mengirim <strong>hanya</strong> perintah buka-sesi dan selektor, lalu membaca kembali
+setelah masing-masing. Tidak ada paket data, tidak ada <code>04 02</code> (commit),
+tidak ada <code>04 F0</code> (finalisasi) — jadi tidak ada yang disimpan ke keyboard.
+</p>
+
+<button id="go">Jalankan pemetaan</button>
+<div id="out">Belum dijalankan.</div>
+
+<script>
+const out = document.getElementById('out');
+const L = (s = '', cls = '') => {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = s;
+  out.appendChild(d);
+};
+const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+// Hanya perintah non-persisten. Sengaja TIDAK memuat 0x02 dan 0xF0.
+const SELECTORS = [
+  { name: 'lampu',        op: 0x13, fields: { 8: 1 } },
+  { name: 'pengaturan',   op: 0x17, fields: { 8: 1 } },
+  { name: 'remap top',    op: 0x11, fields: { 8: 9 } },
+  { name: 'remap fn',     op: 0x27, fields: { 8: 9 } },
+];
+
+function cmd(op, fields = {}) {
+  const p = new Uint8Array(64);
+  p[0] = 0x04;
+  p[1] = op;
+  for (const k of Object.keys(fields)) p[Number(k)] = fields[k];
+  return p;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function read(dev) {
+  const v = await dev.receiveFeatureReport(0);
+  // DataView: sertakan byteOffset/byteLength, jangan pakai .buffer telanjang
+  return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+}
+
+function summarise(bytes) {
+  const term = [];
+  for (let i = 0; i < bytes.length - 1; i++) {
+    if (bytes[i] === 0xaa && bytes[i + 1] === 0x55) term.push(i);
+  }
+  const nz = [...bytes].reduce((n, b) => n + (b !== 0 ? 1 : 0), 0);
+  return `penanda AA55 di offset [${term.join(', ') || '—'}] · ${nz} byte bukan-nol`;
+}
+
+document.getElementById('go').onclick = async () => {
+  out.textContent = '';
+  let dev;
+  try {
+    const devices = await navigator.hid.requestDevice({
+      filters: [{ vendorId: 0x05ac, productId: 0x024f }],
+    });
+    dev = devices.find(d =>
+      (d.collections ?? []).some(c =>
+        (c.featureReports ?? []).some(r =>
+          (r.items ?? []).reduce((n, it) => n + (it.reportSize ?? 0) * (it.reportCount ?? 0), 0) >= 480)));
+    if (!dev) { L('Interface konfigurasi tidak ditemukan.', 'bad'); return; }
+    if (!dev.opened) await dev.open();
+  } catch (e) { L('Gagal membuka: ' + e.message, 'bad'); return; }
+
+  try {
+    const base = await read(dev);
+    L('BASELINE (tanpa selektor apa pun)', 'hi');
+    L('  ' + hex(base.slice(0, 16)) + ' …');
+    L('  ' + summarise(base));
+    L();
+
+    for (const s of SELECTORS) {
+      try {
+        await dev.sendFeatureReport(0, cmd(0x18));            // buka sesi
+        await sleep(2);
+        await dev.sendFeatureReport(0, cmd(s.op, s.fields));  // pilih blok
+        await sleep(2);
+        const got = await read(dev);
+        const same = hex(got) === hex(base);
+        L(`SELEKTOR 04 ${s.op.toString(16).padStart(2, '0')} — ${s.name}`, 'hi');
+        L('  ' + hex(got.slice(0, 16)) + ' …');
+        L('  ' + summarise(got));
+        L(same ? '  → SAMA dengan baseline (bacaan tidak mengikuti selektor)'
+               : '  → BERBEDA dari baseline (bacaan mengikuti selektor)',
+          same ? 'warn' : 'ok');
+        L();
+      } catch (e) {
+        L(`SELEKTOR 04 ${s.op.toString(16)} — ${s.name}: GAGAL ${e.message}`, 'bad');
+        L();
+      }
+    }
+
+    L('='.repeat(60));
+    L('Kalau semua baris "BERBEDA" → bacaan bisa dipilih, seluruh blok terverifikasi.', 'ok');
+    L('Kalau semua "SAMA" → feature report 0 selalu mengembalikan blok yang sama.', 'warn');
+  } finally {
+    try { await dev.close(); } catch {}
+  }
+};
+</script>
