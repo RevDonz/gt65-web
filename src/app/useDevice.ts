@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
-import { requestDevice, sendTransaction, receiveFeatureEcho, DeviceError } from '../gt65/device';
-import { formatLogText, makeEchoResult, makeLogEntry, pushLogEntry } from './log';
-import type { EchoResult, LogEntry } from './log';
+import { requestDevice, sendTransaction, DeviceError } from '../gt65/device';
+import { formatLogText, makeLogEntry, makeReadbackList, pushLogEntry } from './log';
+import type { LogEntry } from './log';
 import { sendToDevLogSink } from './devLogSink';
 
 export type Status = 'idle' | 'connecting' | 'connected' | 'error';
@@ -61,7 +61,11 @@ export function useDevice(dryRun: boolean) {
     const connected = device !== null;
     const decision = sendDecision(dryRun, device);
     let outcome = 'ok';
-    let echo: EchoResult | null = null;
+    // Balikan (read-back) dikumpulkan per paket oleh `sendTransaction` itu
+    // sendiri (satu baca sesudah tiap kirim — lihat device.ts). Di sini
+    // cuma digabung lintas transaksi; tetap kosong untuk 'dry'/'nodevice'
+    // karena keduanya tidak pernah memanggil sendTransaction sama sekali.
+    let readbacks: Uint8Array[] = [];
 
     setLastPackets(packets);
 
@@ -81,19 +85,7 @@ export function useDevice(dryRun: boolean) {
           // satu transaksi gagal hanya menambah keadaan yang tak diketahui
           // pada perangkat yang tidak bisa dibaca balik.
           for (const t of transactions) {
-            await sendTransaction(device as HIDDevice, t);
-          }
-          // Baca balik feature report 0 hanya sesudah pengiriman
-          // sungguhan berhasil. Ini echo dari paket terakhir yang
-          // ditulis, bukan konfigurasi tersimpan — cukup untuk
-          // membuktikan byte sampai ke perangkat. Kegagalan di sini
-          // dicatat tapi tidak menggagalkan transaksi: penulisannya
-          // sudah terjadi.
-          try {
-            const echoBytes = await receiveFeatureEcho(device as HIDDevice);
-            echo = makeEchoResult(echoBytes, packets[packets.length - 1]);
-          } catch (e) {
-            echo = { ok: false, error: String(e) };
+            readbacks = readbacks.concat(await sendTransaction(device as HIDDevice, t));
           }
         } catch (e) {
           const msg = `Gagal mengirim: ${String(e)}`;
@@ -110,7 +102,7 @@ export function useDevice(dryRun: boolean) {
       packets,
       connected,
       outcome,
-      echo,
+      readbacks: makeReadbackList(packets, readbacks),
     });
     setLog((prev) => pushLogEntry(prev, entry));
 

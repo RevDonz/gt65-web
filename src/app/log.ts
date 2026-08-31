@@ -1,27 +1,18 @@
+import { statusByte } from '../gt65/device';
 import { formatHex, hexLine } from './hex';
 import type { SendDecision } from './useDevice';
 
 /**
- * Hasil pembacaan balik feature report 0 sesudah pengiriman sungguhan.
- * `ok: true` berarti pembacaan berhasil (`matched` memberi tahu apakah
- * isinya cocok dengan paket terakhir yang dikirim); `ok: false` berarti
- * pembacaan itu sendiri gagal — transaksi pengiriman tetap dianggap
- * berhasil karena penulisannya sudah terjadi sebelum pembacaan dicoba.
+ * Balikan (read-back) satu paket, dibaca lewat `receiveFeatureReport(0)`
+ * sesaat sesudah paket itu dikirim (lihat `sendTransaction` di device.ts).
+ * `hex` kosong berarti pembacaannya sendiri gagal — penulisannya tetap
+ * dianggap berhasil karena sudah terjadi sebelum pembacaan dicoba.
+ * `status` adalah nilai dari {@link statusByte}: angka untuk paket
+ * perintah dengan balikan yang cukup panjang, `null` untuk paket data
+ * atau balikan yang gagal/terlalu pendek — lihat catatan di statusByte
+ * soal kenapa ini bukan "diterima/ditolak".
  */
-export type EchoResult =
-  | { ok: true; hex: string; matched: boolean }
-  | { ok: false; error: string };
-
-export type LogEntry = {
-  at: string;
-  label: string;
-  decision: SendDecision;
-  packetCount: number;
-  connected: boolean;
-  packetsHex: string;
-  outcome: string;
-  echo: EchoResult | null;
-};
+export type PacketReadback = { hex: string; status: number | null };
 
 /** Bandingkan dua larik byte apa adanya; panjang beda dianggap tak cocok. */
 export function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -32,14 +23,30 @@ export function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-/** Bangun `EchoResult` dari byte balikan dan paket terakhir yang dikirim. */
-export function makeEchoResult(echoBytes: Uint8Array, lastPacket: Uint8Array | undefined): EchoResult {
-  return {
-    ok: true,
-    hex: hexLine(echoBytes),
-    matched: lastPacket !== undefined && bytesEqual(echoBytes, lastPacket),
-  };
+/**
+ * Bangun daftar `PacketReadback`, satu per paket yang dikirim, dari paket
+ * yang dikirim (`sent`) dan balikan yang dibaca sesudahnya (`got`) —
+ * seperti yang dikembalikan `sendTransaction`. Kalau `got` lebih pendek
+ * dari `sent` (transaksi berhenti di tengah jalan karena gagal kirim),
+ * hanya paket yang sempat punya balikan yang dimasukkan.
+ */
+export function makeReadbackList(sent: Uint8Array[], got: Uint8Array[]): PacketReadback[] {
+  return got.map((g, i) => ({
+    hex: g.length > 0 ? hexLine(g) : '',
+    status: statusByte(sent[i], g),
+  }));
 }
+
+export type LogEntry = {
+  at: string;
+  label: string;
+  decision: SendDecision;
+  packetCount: number;
+  connected: boolean;
+  packetsHex: string;
+  outcome: string;
+  readbacks: PacketReadback[];
+};
 
 export function makeLogEntry(params: {
   at: string;
@@ -48,7 +55,7 @@ export function makeLogEntry(params: {
   packets: Uint8Array[];
   connected: boolean;
   outcome: string;
-  echo: EchoResult | null;
+  readbacks: PacketReadback[];
 }): LogEntry {
   return {
     at: params.at,
@@ -58,7 +65,7 @@ export function makeLogEntry(params: {
     connected: params.connected,
     packetsHex: formatHex(params.packets),
     outcome: params.outcome,
-    echo: params.echo,
+    readbacks: params.readbacks,
   };
 }
 
@@ -99,12 +106,15 @@ export function formatLogText(entries: LogEntry[], ctx: {
       `perangkat tersambung: ${e.connected ? 'ya' : 'tidak'}`,
     );
     lines.push(`  hasil: ${e.outcome}`);
-    if (e.echo === null) {
-      lines.push('  echo: tidak dicoba');
-    } else if (e.echo.ok) {
-      lines.push(`  echo: ${e.echo.matched ? 'COCOK' : 'TIDAK COCOK'} (${e.echo.hex})`);
+    if (e.readbacks.length === 0) {
+      lines.push('  baca balik per paket: tidak dicoba (mode kering / tanpa perangkat)');
     } else {
-      lines.push(`  echo: gagal dibaca (${e.echo.error})`);
+      lines.push('  baca balik per paket:');
+      e.readbacks.forEach((r, i) => {
+        const status = r.status === null ? '—' : String(r.status);
+        const hex = r.hex || '(gagal dibaca)';
+        lines.push(`    paket ${i + 1}/${e.packetCount}: status ${status} | ${hex}`);
+      });
     }
     lines.push('  paket:');
     for (const row of e.packetsHex.split('\n')) {

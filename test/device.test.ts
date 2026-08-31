@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { findConfigInterface, sendTransaction, DeviceError, onVendorInput,
+import { findConfigInterface, sendTransaction, statusByte, DeviceError, onVendorInput,
          receiveFeatureEcho, VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
 
 const withFeature = {
@@ -39,10 +39,17 @@ describe('pemilihan interface', () => {
   });
 });
 
+function mockReadback(fill: number): DataView {
+  const buf = new ArrayBuffer(64);
+  new Uint8Array(buf).fill(fill);
+  return new DataView(buf);
+}
+
 describe('pengiriman transaksi', () => {
   test('mengirim tiap paket sebagai feature report 0 sepanjang 64 byte', async () => {
     const sendFeatureReport = vi.fn().mockResolvedValue(undefined);
-    const dev = { opened: true, sendFeatureReport } as unknown as HIDDevice;
+    const receiveFeatureReport = vi.fn().mockResolvedValue(mockReadback(0));
+    const dev = { opened: true, sendFeatureReport, receiveFeatureReport } as unknown as HIDDevice;
     const packets = [new Uint8Array(64), new Uint8Array(64)];
 
     await sendTransaction(dev, packets, 0);
@@ -57,6 +64,83 @@ describe('pengiriman transaksi', () => {
     const dev = { opened: true, sendFeatureReport: vi.fn() } as unknown as HIDDevice;
     await expect(sendTransaction(dev, [new Uint8Array(65)], 0))
       .rejects.toThrow(/64 byte/);
+  });
+
+  test('membaca balik feature report 0 sesudah tiap paket, sebelum paket berikutnya', async () => {
+    const calls: string[] = [];
+    const sendFeatureReport = vi.fn().mockImplementation(async () => { calls.push('kirim'); });
+    const receiveFeatureReport = vi.fn().mockImplementation(async () => {
+      calls.push('baca');
+      return mockReadback(0);
+    });
+    const dev = { opened: true, sendFeatureReport, receiveFeatureReport } as unknown as HIDDevice;
+    const packets = [new Uint8Array(64), new Uint8Array(64), new Uint8Array(64)];
+
+    await sendTransaction(dev, packets, 0);
+
+    expect(receiveFeatureReport).toHaveBeenCalledTimes(3);
+    expect(receiveFeatureReport).toHaveBeenCalledWith(0);
+    expect(calls).toEqual(['kirim', 'baca', 'kirim', 'baca', 'kirim', 'baca']);
+  });
+
+  test('mengembalikan satu balikan per paket, bukan echo tunggal', async () => {
+    const sendFeatureReport = vi.fn().mockResolvedValue(undefined);
+    const receiveFeatureReport = vi.fn()
+      .mockResolvedValueOnce(mockReadback(1))
+      .mockResolvedValueOnce(mockReadback(2));
+    const dev = { opened: true, sendFeatureReport, receiveFeatureReport } as unknown as HIDDevice;
+    const packets = [new Uint8Array(64), new Uint8Array(64)];
+
+    const readbacks = await sendTransaction(dev, packets, 0);
+
+    expect(readbacks).toHaveLength(2);
+    expect(readbacks[0][0]).toBe(1);
+    expect(readbacks[1][0]).toBe(2);
+  });
+
+  test('pembacaan balik yang gagal tidak menggagalkan transaksi', async () => {
+    const sendFeatureReport = vi.fn().mockResolvedValue(undefined);
+    const receiveFeatureReport = vi.fn()
+      .mockRejectedValueOnce(new Error('gagal baca'))
+      .mockResolvedValueOnce(mockReadback(7));
+    const dev = { opened: true, sendFeatureReport, receiveFeatureReport } as unknown as HIDDevice;
+    const packets = [new Uint8Array(64), new Uint8Array(64)];
+
+    const readbacks = await sendTransaction(dev, packets, 0);
+
+    expect(sendFeatureReport).toHaveBeenCalledTimes(2);
+    expect(readbacks).toHaveLength(2);
+    expect(readbacks[0]).toHaveLength(0);
+    expect(readbacks[1][0]).toBe(7);
+  });
+});
+
+describe('statusByte', () => {
+  test('mengembalikan payload[3] balikan untuk paket perintah (payload[0] === 0x04)', () => {
+    const sent = new Uint8Array(64);
+    sent[0] = 0x04;
+    const got = new Uint8Array(64);
+    got[3] = 1;
+    expect(statusByte(sent, got)).toBe(1);
+  });
+
+  test('mengembalikan null untuk paket data (payload[0] !== 0x04)', () => {
+    const sent = new Uint8Array(64);
+    sent[0] = 0x00;
+    const got = new Uint8Array(64);
+    got[3] = 0x42;
+    expect(statusByte(sent, got)).toBeNull();
+  });
+
+  test('mengembalikan null ketika balikan terlalu pendek untuk dibaca', () => {
+    const sent = new Uint8Array(64);
+    sent[0] = 0x04;
+    expect(statusByte(sent, new Uint8Array(0))).toBeNull();
+    expect(statusByte(sent, new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+
+  test('mengembalikan null untuk paket kirim kosong', () => {
+    expect(statusByte(new Uint8Array(0), new Uint8Array(64))).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  bytesEqual, makeEchoResult, makeLogEntry, pushLogEntry, formatLogText,
+  bytesEqual, makeReadbackList, makeLogEntry, pushLogEntry, formatLogText,
 } from '../src/app/log';
 import type { LogEntry } from '../src/app/log';
 
@@ -18,27 +18,43 @@ describe('bytesEqual', () => {
   });
 });
 
-describe('makeEchoResult', () => {
-  test('cocok ketika echo sama dengan paket terakhir', () => {
-    const packet = new Uint8Array([1, 2, 3]);
-    const r = makeEchoResult(new Uint8Array([1, 2, 3]), packet);
-    expect(r).toEqual({ ok: true, hex: '01 02 03', matched: true });
+describe('makeReadbackList', () => {
+  test('paket perintah mendapat status dari payload[3] balikan', () => {
+    const sent = new Uint8Array(64);
+    sent[0] = 0x04; // CLASS
+    const got = new Uint8Array(64);
+    got[3] = 1;
+    const list = makeReadbackList([sent], [got]);
+    expect(list).toHaveLength(1);
+    expect(list[0].status).toBe(1);
+    expect(list[0].hex.length).toBeGreaterThan(0);
   });
 
-  test('tak cocok ketika echo beda dari paket terakhir', () => {
-    const r = makeEchoResult(new Uint8Array([9, 9, 9]), new Uint8Array([1, 2, 3]));
-    expect(r.ok).toBe(true);
-    expect(r).toMatchObject({ matched: false });
+  test('paket data tidak pernah dibaca sebagai status (status null)', () => {
+    const sent = new Uint8Array(64); // payload[0] !== 0x04
+    const got = new Uint8Array(64);
+    got[3] = 0x42; // mis. kanal biru pada paket pencahayaan
+    const list = makeReadbackList([sent], [got]);
+    expect(list[0].status).toBeNull();
   });
 
-  test('tak cocok ketika tidak ada paket terakhir (larik kosong)', () => {
-    const r = makeEchoResult(new Uint8Array([1, 2, 3]), undefined);
-    expect(r).toMatchObject({ matched: false });
+  test('balikan kosong (pembacaan gagal) menghasilkan hex kosong dan status null', () => {
+    const sent = new Uint8Array(64);
+    sent[0] = 0x04;
+    const list = makeReadbackList([sent], [new Uint8Array(0)]);
+    expect(list[0].hex).toBe('');
+    expect(list[0].status).toBeNull();
+  });
+
+  test('hanya memasukkan paket yang sempat punya balikan', () => {
+    const sent = [new Uint8Array(64), new Uint8Array(64)];
+    const got = [new Uint8Array(64)]; // transaksi berhenti sebelum paket kedua
+    expect(makeReadbackList(sent, got)).toHaveLength(1);
   });
 });
 
 describe('makeLogEntry', () => {
-  test('merangkum paket, keputusan, dan echo jadi satu entri', () => {
+  test('merangkum paket, keputusan, dan balikan jadi satu entri', () => {
     const entry = makeLogEntry({
       at: '2026-08-31T00:00:00.000Z',
       label: 'Terapkan pencahayaan',
@@ -46,16 +62,16 @@ describe('makeLogEntry', () => {
       packets: [new Uint8Array(64)],
       connected: true,
       outcome: 'ok',
-      echo: { ok: true, hex: '00 00', matched: true },
+      readbacks: [{ hex: '00 00', status: 1 }],
     });
     expect(entry.packetCount).toBe(1);
     expect(entry.connected).toBe(true);
     expect(entry.decision).toBe('send');
     expect(entry.packetsHex).toContain('paket 1/1');
-    expect(entry.echo).toEqual({ ok: true, hex: '00 00', matched: true });
+    expect(entry.readbacks).toEqual([{ hex: '00 00', status: 1 }]);
   });
 
-  test('echo null ketika tidak dicoba (mis. mode kering)', () => {
+  test('larik balikan kosong ketika tidak dicoba (mis. mode kering)', () => {
     const entry = makeLogEntry({
       at: '2026-08-31T00:00:00.000Z',
       label: 'Terapkan pengaturan',
@@ -63,9 +79,9 @@ describe('makeLogEntry', () => {
       packets: [new Uint8Array(64)],
       connected: false,
       outcome: 'ok',
-      echo: null,
+      readbacks: [],
     });
-    expect(entry.echo).toBeNull();
+    expect(entry.readbacks).toEqual([]);
   });
 });
 
@@ -78,7 +94,7 @@ describe('pushLogEntry', () => {
     connected: false,
     packetsHex: '',
     outcome: 'ok',
-    echo: null,
+    readbacks: [],
   });
 
   test('entri baru ditaruh di depan (terbaru dulu)', () => {
@@ -107,7 +123,7 @@ describe('formatLogText', () => {
         connected: true,
         packetsHex: 'paket 1/1\n  00: 01 02 03',
         outcome: 'ok',
-        echo: { ok: true, hex: '01 02 03', matched: true },
+        readbacks: [{ hex: '01 02 03', status: 1 }],
       },
       {
         at: '2026-08-31T00:01:00.000Z',
@@ -117,7 +133,7 @@ describe('formatLogText', () => {
         connected: false,
         packetsHex: 'paket 1/1\n  00: 04 05 06',
         outcome: 'Belum tersambung ke keyboard.',
-        echo: null,
+        readbacks: [],
       },
     ];
 
@@ -129,7 +145,7 @@ describe('formatLogText', () => {
     expect(text).toContain('Jumlah entri: 2');
     expect(text).toContain('Total paket: 2');
     expect(text).toContain('Terapkan pencahayaan');
-    expect(text).toContain('COCOK');
+    expect(text).toContain('status 1');
     expect(text).toContain('Terapkan pengaturan');
     expect(text).toContain('tidak dicoba');
     expect(text).toContain('Belum tersambung ke keyboard.');
