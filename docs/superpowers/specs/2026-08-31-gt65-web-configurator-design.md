@@ -61,6 +61,22 @@ Konsekuensi: **aplikasi adalah sumber kebenaran, bukan keyboard.** Profil disimp
 
 Langkah implementasi pertama harus menguji `receiveFeatureReport(0)`. Kalau keyboard ternyata menjawab, kendala ini gugur dan desain persistensi bisa disederhanakan. Sampai terbukti, asumsikan write-only.
 
+**Pembaruan: perangkat BISA dibaca, tapi bukan konfigurasi tersimpan.**
+`receiveFeatureReport(0)` memang menjawab — klaim "write-only" di atas terlalu
+kuat. Yang dikembalikan, bagaimanapun, bukan konfigurasi yang bisa di-query
+sesuka hati; ia adalah **buffer echo**: isi laporan fitur terakhir yang
+ditulis ke perangkat, apa pun itu. Ini terbukti saat menyelidiki bug
+`payload[8]` di Bagian 5.4 — membaca feature report 0 setelah software
+vendor mengirim paket lampu mengembalikan persis paket data lampu itu
+(termasuk penanda `AA 55` di posisi yang sama), bukan representasi
+"pengaturan lampu yang sedang aktif" yang independen dari histori tulis.
+Konsekuensinya tetap sama seperti sebelumnya untuk tujuan persistensi —
+aplikasi tetap harus jadi sumber kebenaran, karena pembacaan ini tidak bisa
+dipakai untuk mengambil konfigurasi tersimpan kapan saja — tetapi jalur baca
+ini berguna sebagai alat diagnostik: mengirim satu paket lalu segera
+membacanya kembali adalah cara memverifikasi byte demi byte apa yang benar-benar
+diterima perangkat, seperti yang dipakai untuk menemukan `payload[8]`.
+
 ### 3.4 Izin perangkat di Linux
 
 `/dev/hidraw*` bawaannya root-only, sehingga browser tidak bisa membuka perangkat. Perlu udev rule:
@@ -145,12 +161,25 @@ Untuk data melebihi satu paket, buffer dipecah menjadi potongan 64 byte, masing-
 cmd(0x18)                       buka sesi
 cmd(0x13, {8: 1})               pilih pencahayaan
 data({0: mode, 1: R, 2: G, 3: B,
+      8: 1,
       9: speed + 1, 10: brightness + 1, 11: direction}, term_at = 14)
 cmd(0x02)                       commit
 cmd(0xF0)                       finalisasi
 ```
 
 `speed` dan `brightness` disimpan berbasis nol di UI dan dinaikkan satu sebelum dikirim.
+
+**Bug yang sudah ditemukan dan diperbaiki: `payload[8]` pada paket data hilang
+dari spec ini.** Versi sebelumnya dari pseudocode di atas tidak menyebut
+`payload[8]` sama sekali, dan implementasi awal mengikutinya persis —
+akibatnya paket data dikirim tanpa byte itu, dan keyboard mengabaikan
+transaksi tanpa memunculkan error apa pun. Disassembly vendor (`DeviceDriver.exe`,
+FUNC `0x41D7B0`) menulis byte ini bersama mode/R/G/B, sebelum penanda AA 55.
+Nilai `0x01` diperoleh dengan membaca kembali feature report 0 dari perangkat
+sungguhan setelah software vendor menulis paket lampu — lihat catatan
+pembaruan di Bagian 3.3 tentang apa sebenarnya yang dikembalikan pembacaan
+itu. Makna byte ini sendiri belum diketahui; `1` diperlakukan sebagai
+konstanta sampai ada bukti sebaliknya, bukan opsi yang diekspos ke pengguna.
 
 **Yang belum pasti: daftar nilai `mode` yang sah.** Software vendor mengambilnya
 dari daftar mode di UI-nya, dan nilainya tidak muncul sebagai konstanta di

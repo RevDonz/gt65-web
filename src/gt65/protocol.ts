@@ -67,6 +67,10 @@ export function lighting(c: Lighting): Uint8Array[] {
     data({
       0: c.mode,
       1: c.r, 2: c.g, 3: c.b,
+      // payload[8]: vendor menulis byte ini juga (FUNC 0x41D7B0, ebp-0x4c).
+      // Nilai yang teramati di perangkat sungguhan adalah 0x01; makna
+      // pastinya belum diketahui. Tanpa ini paket diabaikan keyboard.
+      8: 1,
       9: c.speed + 1,
       10: c.brightness + 1,
       11: c.direction,

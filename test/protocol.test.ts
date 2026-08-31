@@ -91,9 +91,19 @@ describe('transaksi pencahayaan', () => {
 
   test('offset yang tidak dipakai tetap nol', () => {
     const d = lighting(cfg)[2];
-    expect([d[4], d[5], d[6], d[7], d[8]]).toEqual([0, 0, 0, 0, 0]);
+    expect([d[4], d[5], d[6], d[7]]).toEqual([0, 0, 0, 0]);
     expect([d[12], d[13]]).toEqual([0, 0]);
     expect([...d.subarray(16)].every((b) => b === 0)).toBe(true);
+  });
+
+  /**
+   * payload[8] ditulis vendor (FUNC 0x41D7B0) tapi tidak disebut di spec asli
+   * — itulah sebabnya paket data diabaikan keyboard tanpa error. Nilainya
+   * dibaca dari buffer perangkat sungguhan: 0x01.
+   */
+  test('paket data menulis payload[8] = 1', () => {
+    const d = lighting(cfg)[2];
+    expect(d[8]).toBe(1);
   });
 });
 
