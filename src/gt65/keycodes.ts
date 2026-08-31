@@ -2,11 +2,12 @@ import type { Entry } from './protocol';
 
 export type Action = { id: string; label: string; entry: Entry };
 
+/** Bitmask modifier HID standar (spec Bagian 5.5). */
 export const MODIFIERS = {
-  ctrl: 0x01,
+  ctrl:  0x01,
   shift: 0x02,
-  alt: 0x04,
-  gui: 0x08,
+  alt:   0x04,
+  gui:   0x08,
 } as const;
 
 export const MEDIA_ACTIONS: Action[] = [
@@ -30,15 +31,17 @@ export const MOUSE_ACTIONS: Action[] = [
   { id: 'scroll_down', label: 'Scroll turun', entry: { kind: 'mouse', ev: 3, val: 0xff } },
 ];
 
+const { ctrl, alt, gui } = MODIFIERS;
+
 export const SHORTCUTS: Action[] = [
-  { id: 'show_desktop',   label: 'Tampilkan desktop (Win+D)', entry: { kind: 'key', mod: 0x08, usage: 0x07 } },
-  { id: 'my_computer',    label: 'File Explorer (Win+E)',     entry: { kind: 'key', mod: 0x08, usage: 0x08 } },
-  { id: 'lock',           label: 'Kunci layar (Win+L)',       entry: { kind: 'key', mod: 0x08, usage: 0x0f } },
-  { id: 'close_window',   label: 'Tutup jendela (Ctrl+W)',    entry: { kind: 'key', mod: 0x01, usage: 0x1a } },
-  { id: 'switch_windows', label: 'Ganti jendela (Alt+Tab)',   entry: { kind: 'key', mod: 0x04, usage: 0x2b } },
-  { id: 'copy',           label: 'Salin (Ctrl+C)',            entry: { kind: 'key', mod: 0x01, usage: 0x06 } },
-  { id: 'paste',          label: 'Tempel (Ctrl+V)',           entry: { kind: 'key', mod: 0x01, usage: 0x19 } },
-  { id: 'cut',            label: 'Potong (Ctrl+X)',           entry: { kind: 'key', mod: 0x01, usage: 0x1b } },
+  { id: 'show_desktop',   label: 'Tampilkan desktop (Win+D)', entry: { kind: 'key', mod: gui,  usage: 0x07 } },
+  { id: 'my_computer',    label: 'File Explorer (Win+E)',     entry: { kind: 'key', mod: gui,  usage: 0x08 } },
+  { id: 'lock',           label: 'Kunci layar (Win+L)',       entry: { kind: 'key', mod: gui,  usage: 0x0f } },
+  { id: 'close_window',   label: 'Tutup jendela (Ctrl+W)',    entry: { kind: 'key', mod: ctrl, usage: 0x1a } },
+  { id: 'switch_windows', label: 'Ganti jendela (Alt+Tab)',   entry: { kind: 'key', mod: alt,  usage: 0x2b } },
+  { id: 'copy',           label: 'Salin (Ctrl+C)',            entry: { kind: 'key', mod: ctrl, usage: 0x06 } },
+  { id: 'paste',          label: 'Tempel (Ctrl+V)',           entry: { kind: 'key', mod: ctrl, usage: 0x19 } },
+  { id: 'cut',            label: 'Potong (Ctrl+X)',           entry: { kind: 'key', mod: ctrl, usage: 0x1b } },
 ];
 
 /** Subset HID usage yang bisa dipilih sebagai tombol biasa. */
