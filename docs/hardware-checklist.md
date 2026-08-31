@@ -59,27 +59,31 @@ Tempelkan hasilnya ke saya apa adanya.
 
 ## Nanti — setelah panelnya jadi
 
-### Task 10 langkah 4: daftar nilai mode lampu
+### Task 10 langkah 4: daftar nilai mode lampu — SELESAI (2026-08-31)
 
-Paling aman dari semua eksperimen. Kegagalan terburuknya hanya warna yang salah.
+**Status: DONE.** Hasil diamati langsung di hardware fisik, dicatat ke spec
+Bagian 5.4 dan diterapkan ke kode. Jangan ulangi langkah ini.
 
-Dropdown Mode sekarang berisi 22 nama efek dari tabel string vendor
-(`1033.lan` ID 200–221), dengan indeks daftar sebagai nilai byte. **Urutan itu
-dugaan, bukan fakta** — yang diuji di sini justru apakah dugaannya benar.
+Hasilnya:
 
-Matikan mode kering, lalu pilih tiap entri berurutan dari `0 · Static` sampai
-`21 · Floweriness`, klik Terapkan, dan catat efek lampu yang benar-benar
-terlihat di sebelah nama yang dipilih.
-
-Tiga kemungkinan hasil, semuanya berguna:
-
-- nama cocok dengan efek di seluruh daftar → urutan terkonfirmasi, hapus
-  peringatan di panel Lampu;
-- cocok tapi tergeser konstan → catat pergeserannya;
-- tidak ada hubungan → daftar nama tetap berguna, tapi pemetaan harus
-  disusun ulang dari nol.
-
-Catat juga nilai mana yang tidak menghasilkan perubahan apa pun.
+- **Rentang nilai `mode` yang sah adalah 1 sampai 19.** Nilai `0`, `20`, dan
+  `21` diuji dan tidak menyalakan lampu sama sekali. Manual keyboard
+  menyebut 18 mode efek — konsisten dengan rentang ini kalau "LED Off"
+  (indeks 19) tidak dihitung sebagai efek tersendiri.
+- **Urutan nama di `LIGHT_MODES` (dari tabel string vendor `1033.lan` ID
+  200–221) terkonfirmasi benar untuk rentang 1..19.** Mode `11` diamati
+  menghasilkan efek "Rotating" — persis nama pada indeks 11 di daftar.
+- **`payload[9]` adalah kecerahan, `payload[10]` adalah kecepatan** —
+  ditemukan sambil menyapu byte-byte ini di keyboard fisik. Ini kebalikan
+  dari label lama (`speed` di `payload[9]`, `brightness` di `payload[10]`),
+  yang cuma tebakan dari urutan field di disassembly.
+- **`direction` punya empat nilai sah dengan dua perilaku:** `0` dan `3`
+  beranimasi kiri-ke-kanan; `1` dan `2` beranimasi kanan-ke-kiri.
+- **Belum diketahui:** mode mana saja yang benar-benar dipengaruhi warna
+  RGB. Saat diuji dengan warna kuning, tidak jelas mode mana yang memakai
+  warna itu — kemungkinan sebagian mode animasi/multiwarna mengabaikan
+  `r`/`g`/`b`. Ini masih terbuka; jangan menganggap warna berlaku ke semua
+  mode.
 
 ### Task 11 langkah 3: pemetaan lima flag pengaturan
 

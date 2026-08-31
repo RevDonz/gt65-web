@@ -82,11 +82,16 @@ describe('transaksi pencahayaan', () => {
     expect(d[15]).toBe(0x55);
   });
 
-  test('speed dan brightness dinaikkan satu, arah tidak', () => {
+  /**
+   * Pemetaan TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): payload[9]
+   * adalah kecerahan, payload[10] adalah kecepatan — kebalikan dari label
+   * lama. Keduanya dinaikkan satu, arah tidak.
+   */
+  test('brightness ke payload[9], speed ke payload[10], keduanya dinaikkan satu; arah tidak', () => {
     const d = lighting(cfg)[2];
-    expect(d[9]).toBe(4);
-    expect(d[10]).toBe(3);
-    expect(d[11]).toBe(4);
+    expect(d[9]).toBe(3);  // brightness (2) + 1
+    expect(d[10]).toBe(4); // speed (3) + 1
+    expect(d[11]).toBe(4); // direction, tidak dinaikkan
   });
 
   test('offset yang tidak dipakai tetap nol', () => {
@@ -110,10 +115,14 @@ describe('transaksi pencahayaan', () => {
    * Paket emas: byte-demi-byte sama dengan buffer feature report yang
    * dibaca balik dari perangkat sungguhan setelah software vendor asli
    * mengirim paket ini (bukan ditulis ulang oleh app ini). Ini satu-satunya
-   * ground truth yang kita punya untuk `speed`/`brightness` — slider lama
-   * (batas 0-4) tidak pernah bisa menjangkau nilai UI 15 dan 10 yang
-   * dipakai di sini. Kalau tes ini gagal, `lighting()` tidak lagi
-   * menghasilkan byte yang terbukti pernah menyalakan keyboard ini.
+   * ground truth yang kita punya untuk `speed`/`brightness`. Nilai `speed`
+   * dan `brightness` di fixture ini SUDAH DITUKAR dari versi lama tes ini
+   * (dulu speed:15, brightness:10) karena kalibrasi hardware (2026-08-31)
+   * membuktikan payload[9] adalah kecerahan dan payload[10] adalah
+   * kecepatan — jadi untuk menghasilkan byte vendor yang identik
+   * (payload[9]=0x10, payload[10]=0x0b), brightness harus 15 dan speed
+   * harus 10. Kalau tes ini gagal, `lighting()` tidak lagi menghasilkan
+   * byte yang terbukti pernah menyalakan keyboard ini.
    *
    * vendor : 0b ff 00 00 00 00 00 00 01 10 0b 00 00 00 aa 55
    */
@@ -124,7 +133,7 @@ describe('transaksi pencahayaan', () => {
     ];
     const d = lighting({
       mode: 0x0b, r: 0xff, g: 0x00, b: 0x00,
-      speed: 15, brightness: 10, direction: 0,
+      speed: 10, brightness: 15, direction: 0,
     })[2];
     expect([...d.subarray(0, 16)]).toEqual(vendor);
   });
@@ -138,6 +147,23 @@ describe('transaksi pencahayaan', () => {
     const d = lighting({ ...cfg, speed: 15, brightness: 15 })[2];
     expect(d[9]).toBe(16);
     expect(d[10]).toBe(16);
+  });
+
+  /**
+   * UI membatasi pilihan mode ke 1..19 (TERKONFIRMASI DI HARDWARE
+   * SUNGGUHAN, 2026-08-31: 0, 20, 21 tidak menyalakan lampu sama sekali —
+   * lihat LIGHT_MODE_MIN/LIGHT_MODE_MAX di LightingPanel). Tapi `lighting()`
+   * ada di lapisan protokol, bukan lapisan UI: ia harus tetap jujur dan
+   * meng-encode berapa pun nilai mode yang diberikan, tanpa memotong atau
+   * melempar error. Pembatasan itu murni tanggung jawab UI.
+   */
+  test('mode di luar 1..19 tetap bisa di-encode, builder tidak memotong', () => {
+    const d0 = lighting({ ...cfg, mode: 0 })[2];
+    expect(d0[0]).toBe(0);
+    const d20 = lighting({ ...cfg, mode: 20 })[2];
+    expect(d20[0]).toBe(20);
+    const d200 = lighting({ ...cfg, mode: 200 })[2];
+    expect(d200[0]).toBe(200);
   });
 });
 

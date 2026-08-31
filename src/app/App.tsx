@@ -131,7 +131,12 @@ export function App() {
                            'Kirim nilai vendor (referensi)',
                            lighting({
                              mode: 0x0b, r: 0xff, g: 0x00, b: 0x00,
-                             speed: 15, brightness: 10, direction: 0,
+                             // speed/brightness ditukar dari nilai lama supaya
+                             // byte payload[9]/[10] yang dikirim tetap identik
+                             // dengan buffer yang terbaca dari perangkat
+                             // sungguhan — lihat protocol.ts untuk pemetaan
+                             // yang sudah dikonfirmasi hardware.
+                             speed: 10, brightness: 15, direction: 0,
                            }),
                          )} />
         )}

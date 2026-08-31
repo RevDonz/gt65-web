@@ -51,14 +51,21 @@ export function chunks(buf: Uint8Array): Uint8Array[] {
 export type Lighting = {
   mode: number;
   r: number; g: number; b: number;
-  speed: number;       // basis nol di UI
-  brightness: number;  // basis nol di UI
+  speed: number;       // basis nol di UI; dikirim ke payload[10]
+  brightness: number;  // basis nol di UI; dikirim ke payload[9]
   direction: number;
 };
 
 /**
  * Byte 9 dan 10 dikirim berbasis satu; software vendor menaikkan
  * keduanya dengan `inc al` sebelum menyimpan ke paket.
+ *
+ * Pemetaan payload[9] = kecerahan dan payload[10] = kecepatan
+ * TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): kedua byte disapu
+ * satu per satu di keyboard fisik sambil mengamati langsung efeknya —
+ * bukan lagi ditebak dari urutan field di disassembly. Ini kebalikan dari
+ * dugaan awal (yang menamai payload[9] "speed" dan payload[10]
+ * "brightness"); dugaan itu sekarang diketahui salah.
  */
 export function lighting(c: Lighting): Uint8Array[] {
   return [
@@ -71,8 +78,8 @@ export function lighting(c: Lighting): Uint8Array[] {
       // Nilai yang teramati di perangkat sungguhan adalah 0x01; makna
       // pastinya belum diketahui. Tanpa ini paket diabaikan keyboard.
       8: 1,
-      9: c.speed + 1,
-      10: c.brightness + 1,
+      9: c.brightness + 1,
+      10: c.speed + 1,
       11: c.direction,
     }, 14),
     cmd(0x02),

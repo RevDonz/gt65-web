@@ -162,7 +162,7 @@ cmd(0x18)                       buka sesi
 cmd(0x13, {8: 1})               pilih pencahayaan
 data({0: mode, 1: R, 2: G, 3: B,
       8: 1,
-      9: speed + 1, 10: brightness + 1, 11: direction}, term_at = 14)
+      9: brightness + 1, 10: speed + 1, 11: direction}, term_at = 14)
 cmd(0x02)                       commit
 cmd(0xF0)                       finalisasi
 ```
@@ -181,12 +181,43 @@ pembaruan di Bagian 3.3 tentang apa sebenarnya yang dikembalikan pembacaan
 itu. Makna byte ini sendiri belum diketahui; `1` diperlakukan sebagai
 konstanta sampai ada bukti sebaliknya, bukan opsi yang diekspos ke pengguna.
 
-**Yang belum pasti: daftar nilai `mode` yang sah.** Software vendor mengambilnya
-dari daftar mode di UI-nya, dan nilainya tidak muncul sebagai konstanta di
-disassembly. Ini juga murah ditentukan secara empiris — kirim nilai 0, 1, 2, …
-berurutan dan amati efek lampunya, karena hasilnya terlihat seketika dan tidak
-berbahaya. Lakukan sebagai bagian dari tahap 4 di Bagian 10, lalu catat hasilnya
-kembali ke dokumen ini.
+**TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): `payload[9]` adalah
+kecerahan, `payload[10]` adalah kecepatan.** Versi sebelumnya dari dokumen ini
+menamai keduanya sebaliknya (`speed` di `payload[9]`, `brightness` di
+`payload[10]`), berdasarkan urutan field di disassembly vendor — dugaan itu
+sekarang terbukti salah. Cara konfirmasi: menyapu nilai tiap byte satu per
+satu langsung di keyboard fisik dan mengamati mana yang mengubah kecepatan
+animasi dan mana yang mengubah kecerahan LED. `src/gt65/protocol.ts` dan
+`src/store/profile.ts` sudah diperbaiki mengikuti pemetaan ini; label "belum
+pasti" di kode dan UI untuk kedua field ini sudah dihapus.
+
+**TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): rentang nilai `mode` yang
+sah adalah 1 sampai 19.** Nilai 0, 20, dan 21 diuji langsung di keyboard fisik
+dan tidak menyalakan lampu sama sekali. Manual keyboard menyebut 18 mode
+efek — konsisten dengan rentang ini kalau "LED Off" (indeks 19 di
+`LIGHT_MODES`) tidak dihitung sebagai efek lampu tersendiri.
+
+**TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): urutan nama efek di
+`LIGHT_MODES` (diambil dari tabel string vendor `1033.lan`, ID 200–221) benar
+untuk rentang 1..19.** Mode `11` diamati langsung menghasilkan efek
+"Rotating" di keyboard fisik, persis nama pada indeks 11 di daftar tersebut.
+Peringatan "urutan belum terkonfirmasi" yang sebelumnya ada di
+`LightingPanel` sudah dihapus.
+
+**TERKONFIRMASI DI HARDWARE SUNGGUHAN (2026-08-31): `direction` punya empat
+nilai yang sah dengan dua perilaku berbeda.** Nilai `0` dan `3` beranimasi
+kiri-ke-kanan; nilai `1` dan `2` beranimasi kanan-ke-kiri. UI mengekspos
+keempatnya sebagai pilihan berlabel (bukan angka mentah), memakai perilaku
+yang teramati ini sebagai labelnya.
+
+**Masih belum pasti: mode mana saja yang benar-benar dipengaruhi warna RGB.**
+Saat menguji dengan warna kuning, pengamat tidak bisa memastikan mode mana
+yang benar-benar menerapkan warna itu — kemungkinan sebagian mode (terutama
+efek animasi/multiwarna) mengabaikan `r`/`g`/`b` dan memakai warnanya sendiri,
+sementara mode lain mengikuti warna yang diset. Ini BUKAN diklaim berlaku
+universal; `LightingPanel` mencantumkan catatan singkat soal ini, dan
+pemetaan mode-ke-penerapan-warna masih menunggu langkah hardware lebih
+lanjut.
 
 **Pengaturan sistem**
 

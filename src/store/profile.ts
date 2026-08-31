@@ -43,19 +43,21 @@ function emptyLayer(): Entry[] {
  * Lihat docs/hardware-checklist.md, Task 14 — uji "semua tombol kembali
  * normal" saja tidak akan menangkap hilangnya layer Fn.
  *
- * NILAI SEMENTARA: `lighting.mode` dan `settings.flags` di bawah masih
- * penampung, bukan nilai terkonfirmasi — daftar nilai mode lampu dan makna
- * kelima flag masih menunggu langkah hardware (spec Bagian 5.4).
+ * NILAI SEMENTARA: `settings.flags` di bawah masih penampung, bukan nilai
+ * terkonfirmasi — makna kelima flag masih menunggu langkah hardware (spec
+ * Bagian 5.4).
  *
- * `lighting.speed` dan `lighting.brightness`, sebaliknya, bukan lagi
- * tebakan: 15 dan 10 diambil langsung dari paket vendor sungguhan yang
- * terbaca di buffer perangkat (lihat tombol "Kirim nilai vendor" di
- * LightingPanel) — nilai lama (2 dan 4) nyaris gelap di rentang byte yang
- * sebenarnya dipakai keyboard dan tidak pernah terbukti bekerja. Yang
- * BELUM DIPASTIKAN adalah label mana yang benar milik field yang mana:
- * `speed` ditulis ke payload[9] dan `brightness` ke payload[10] hanya
- * berdasarkan urutan field di disassembly, bukan bukti langsung — kedua
- * label ini bisa saja tertukar.
+ * `lighting.mode`, `lighting.speed`, dan `lighting.brightness` TIDAK lagi
+ * sementara — ketiganya terkonfirmasi di hardware sungguhan (2026-08-31):
+ * mode 6 ("Breath") ada di rentang 1..19 yang terbukti menyalakan lampu
+ * (0, 20, 21 terbukti tidak menyalakan apa pun); payload[9] terbukti
+ * kecerahan dan payload[10] terbukti kecepatan (kebalikan dari dugaan
+ * awal berdasar urutan field di disassembly). Nilai 7 untuk speed/
+ * brightness adalah titik tengah rentang UI 0-15, dipilih sebagai bawaan
+ * yang wajar, bukan hasil pengukuran spesifik.
+ *
+ * Yang BELUM DIPASTIKAN: mode mana saja yang benar-benar dipengaruhi oleh
+ * `r`/`g`/`b` — lihat catatan di LightingPanel.
  */
 export function defaultProfile(): Profile {
   const top = emptyLayer();
@@ -66,8 +68,8 @@ export function defaultProfile(): Profile {
     version: VERSION,
     name: 'Bawaan',
     layers: { top, fn: emptyLayer() },
-    lighting: { mode: 0, r: 0xff, g: 0xff, b: 0xff,
-                speed: 15, brightness: 10, direction: 0 },
+    lighting: { mode: 6, r: 0xff, g: 0xff, b: 0xff,
+                speed: 7, brightness: 7, direction: 0 },
     settings: { flags: [false, false, false, false, false], sleepTimeout: 0 },
   };
 }
