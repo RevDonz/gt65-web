@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { DeviceBar } from './DeviceBar';
 import { useDevice } from './useDevice';
 import { formatHex } from './hex';
+import { LightingPanel } from './panels/LightingPanel';
+import { lighting } from '../gt65/protocol';
 import { loadProfile, saveProfile } from '../store/profile';
 import type { Profile } from '../store/profile';
 
@@ -30,11 +32,17 @@ export function App() {
         ))}
       </nav>
       <main className="px-6 pb-10">
-        <p className="text-slate-400">
-          Profil <strong>{profile.name}</strong> — tab {tab}, panel diisi pada task berikutnya.
-        </p>
+        {tab === 'Lampu' && (
+          <LightingPanel profile={profile} onChange={setProfile}
+                         onApply={() => dev.send(lighting(profile.lighting))} />
+        )}
+        {tab !== 'Lampu' && (
+          <p className="text-slate-400">
+            Profil <strong>{profile.name}</strong> — tab {tab}, panel diisi pada task berikutnya.
+          </p>
+        )}
         <button onClick={() => setProfile({ ...profile, name: profile.name })}
-                className="mt-2 rounded border border-slate-600 px-3 py-1">
+                className="mt-4 rounded border border-slate-600 px-3 py-1">
           Simpan profil
         </button>
         {dev.lastPackets.length > 0 && (
