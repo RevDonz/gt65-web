@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { DeviceBar } from './DeviceBar';
 import { useDevice } from './useDevice';
 import { formatHex } from './hex';
+import { RestoreButton } from './RestoreButton';
 import { LightingPanel } from './panels/LightingPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { MonitorPanel } from './panels/MonitorPanel';
 import { RemapPanel } from './panels/RemapPanel';
 import { lighting, settings, remap } from '../gt65/protocol';
-import { loadProfile, saveProfile } from '../store/profile';
+import { defaultProfile, loadProfile, saveProfile } from '../store/profile';
 import type { Profile } from '../store/profile';
 
 const TABS = ['Remap', 'Lampu', 'Pengaturan', 'Monitor'] as const;
@@ -33,6 +34,14 @@ export function App() {
             {t}
           </button>
         ))}
+        <RestoreButton onRestore={async () => {
+          const d = defaultProfile();
+          setProfile(d);
+          await dev.send(remap('top', d.layers.top));
+          await dev.send(remap('fn', d.layers.fn));
+          await dev.send(lighting(d.lighting));
+          await dev.send(settings(d.settings));
+        }} />
       </nav>
       <main className="px-6 pb-10">
         {tab === 'Remap' && (
