@@ -1,7 +1,16 @@
 import type { Entry } from './protocol';
 import { KEYS } from './layout';
 
-export type Action = { id: string; label: string; entry: Entry };
+/**
+ * `short`, kalau ada, adalah bentuk sesingkat mungkin dari `label` — dipakai
+ * `entryLabel` di bawah untuk legenda utama keycap, yang jauh lebih sempit
+ * daripada tombol pemilih di panel kanan. Duduk di dalam katalog yang sama
+ * dengan `label` (bukan tabel terpisah di tempat lain) supaya menambah aksi
+ * baru tidak bisa lupa memberinya bentuk singkat: keduanya terlihat
+ * berdampingan di sini. Tanpa `short`, `entryLabel` jatuh ke `label` apa
+ * adanya (sudah cukup pendek, mis. "Stop", "Klik kiri").
+ */
+export type Action = { id: string; label: string; short?: string; entry: Entry };
 
 /** Bitmask modifier HID standar (spec Bagian 5.5). */
 export const MODIFIERS = {
@@ -11,25 +20,36 @@ export const MODIFIERS = {
   gui:   0x08,
 } as const;
 
+/**
+ * Nama tampilan sesingkat mungkin tiap bit modifier — satu-satunya tempat
+ * pemetaan ini didefinisikan, dipakai baik oleh `describeEntry` (RemapPanel,
+ * bentuk lengkap "Ctrl + C") maupun `entryLabel` di bawah (bentuk keycap
+ * "Ctrl+C"), supaya keduanya tidak bisa berbeda diam-diam.
+ */
+export const MOD_NAMES: [number, string][] = [
+  [MODIFIERS.ctrl, 'Ctrl'], [MODIFIERS.shift, 'Shift'],
+  [MODIFIERS.alt, 'Alt'], [MODIFIERS.gui, 'Win'],
+];
+
 export const MEDIA_ACTIONS: Action[] = [
-  { id: 'play_pause', label: 'Play / Pause', entry: { kind: 'media', usage: 0xcd } },
-  { id: 'stop',       label: 'Stop',         entry: { kind: 'media', usage: 0xb7 } },
-  { id: 'prev',       label: 'Sebelumnya',   entry: { kind: 'media', usage: 0xb6 } },
-  { id: 'next',       label: 'Berikutnya',   entry: { kind: 'media', usage: 0xb5 } },
-  { id: 'vol_up',     label: 'Volume +',     entry: { kind: 'media', usage: 0xe9 } },
-  { id: 'vol_down',   label: 'Volume −',     entry: { kind: 'media', usage: 0xea } },
-  { id: 'mute',       label: 'Bisukan',      entry: { kind: 'media', usage: 0xe2 } },
+  { id: 'play_pause', label: 'Play / Pause', short: 'Play',   entry: { kind: 'media', usage: 0xcd } },
+  { id: 'stop',       label: 'Stop',                          entry: { kind: 'media', usage: 0xb7 } },
+  { id: 'prev',       label: 'Sebelumnya',   short: 'Mundur', entry: { kind: 'media', usage: 0xb6 } },
+  { id: 'next',       label: 'Berikutnya',   short: 'Maju',   entry: { kind: 'media', usage: 0xb5 } },
+  { id: 'vol_up',     label: 'Volume +',     short: 'Vol+',   entry: { kind: 'media', usage: 0xe9 } },
+  { id: 'vol_down',   label: 'Volume −',     short: 'Vol−',   entry: { kind: 'media', usage: 0xea } },
+  { id: 'mute',       label: 'Bisukan',      short: 'Bisu',   entry: { kind: 'media', usage: 0xe2 } },
 ];
 
 export const MOUSE_ACTIONS: Action[] = [
-  { id: 'left',        label: 'Klik kiri',    entry: { kind: 'mouse', ev: 1, val: 0x01 } },
-  { id: 'right',       label: 'Klik kanan',   entry: { kind: 'mouse', ev: 1, val: 0x02 } },
-  { id: 'middle',      label: 'Klik tengah',  entry: { kind: 'mouse', ev: 1, val: 0x04 } },
-  { id: 'button4',     label: 'Tombol 4',     entry: { kind: 'mouse', ev: 1, val: 0x08 } },
-  { id: 'button5',     label: 'Tombol 5',     entry: { kind: 'mouse', ev: 1, val: 0x10 } },
-  { id: 'double',      label: 'Klik ganda',   entry: { kind: 'mouse', ev: 1, val: 0x03 } },
-  { id: 'scroll_up',   label: 'Scroll naik',  entry: { kind: 'mouse', ev: 3, val: 0x01 } },
-  { id: 'scroll_down', label: 'Scroll turun', entry: { kind: 'mouse', ev: 3, val: 0xff } },
+  { id: 'left',        label: 'Klik kiri',                       entry: { kind: 'mouse', ev: 1, val: 0x01 } },
+  { id: 'right',       label: 'Klik kanan',                      entry: { kind: 'mouse', ev: 1, val: 0x02 } },
+  { id: 'middle',      label: 'Klik tengah',                     entry: { kind: 'mouse', ev: 1, val: 0x04 } },
+  { id: 'button4',     label: 'Tombol 4',                        entry: { kind: 'mouse', ev: 1, val: 0x08 } },
+  { id: 'button5',     label: 'Tombol 5',                        entry: { kind: 'mouse', ev: 1, val: 0x10 } },
+  { id: 'double',      label: 'Klik ganda',                      entry: { kind: 'mouse', ev: 1, val: 0x03 } },
+  { id: 'scroll_up',   label: 'Scroll naik',  short: 'Scroll ↑', entry: { kind: 'mouse', ev: 3, val: 0x01 } },
+  { id: 'scroll_down', label: 'Scroll turun', short: 'Scroll ↓', entry: { kind: 'mouse', ev: 3, val: 0xff } },
 ];
 
 const { ctrl, alt, gui } = MODIFIERS;
@@ -180,3 +200,60 @@ export const HID_KEY_GROUPS: KeyGroup[] = (Object.keys(KEY_GROUP_LABELS) as KeyG
 
 /** Daftar datar semua opsi tombol biasa, untuk pencarian by-usage. */
 export const HID_KEYS: { usage: number; label: string }[] = HID_KEY_GROUPS.flatMap((g) => g.keys);
+
+/**
+ * Bandingkan dua entri apa adanya (bukan berdasar tampilannya). Dipakai
+ * KeyboardGrid untuk menandai tombol yang berbeda dari bawaan pabriknya
+ * (aksen di tepi bawah keycap) dan RemapPanel untuk menyalakan tombol
+ * "Kembalikan ke default" hanya saat memang ada yang berubah.
+ */
+export function entriesEqual(a: Entry, b: Entry): boolean {
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'none':  return true;
+    case 'key':   return b.kind === 'key' && a.mod === b.mod && a.usage === b.usage;
+    case 'media': return b.kind === 'media' && a.usage === b.usage;
+    case 'mouse': return b.kind === 'mouse' && a.ev === b.ev && a.val === b.val;
+    case 'macro': return b.kind === 'macro' && a.slot === b.slot
+                      && a.mode === b.mode && a.repeat === b.repeat;
+  }
+}
+
+/**
+ * "Apa bunyi entri ini sekarang", dalam bentuk sesingkat mungkin untuk
+ * legenda utama keycap (mis. "A", "Vol+", "Win+D", "Klik kiri") — TIDAK
+ * PERNAH hex mentah, karena keycap yang menampilkan "0xE9" tidak berguna
+ * bagi siapa pun yang bukan penulis firmware. Seluruhnya diturunkan dari
+ * katalog yang sama dipakai pemilih tombol (`HID_KEYS`, `MOD_NAMES`,
+ * `MEDIA_ACTIONS`, `MOUSE_ACTIONS`) — sengaja TIDAK ada tabel nama kedua di
+ * sini yang bisa lupa disentuh saat katalog itu berubah.
+ *
+ * Kombinasi modifier+tombol (mis. shortcut Win+D) tidak dicocokkan ke
+ * `SHORTCUTS` secara langsung — nama modifier dari `MOD_NAMES` digabung
+ * dengan label tombol dari `HID_KEYS` sudah cukup untuk menghasilkan bentuk
+ * yang sama ("Win+D", "Ctrl+C"), dan itu otomatis berlaku untuk kombinasi
+ * modifier+tombol APA PUN, bukan cuma delapan yang ada di `SHORTCUTS`.
+ */
+export function entryLabel(entry: Entry): string {
+  switch (entry.kind) {
+    case 'none':
+      return 'Nonaktif';
+    case 'key': {
+      const keyLabel = HID_KEYS.find((k) => k.usage === entry.usage)?.label ?? '?';
+      if (entry.mod === 0) return keyLabel;
+      const mods = MOD_NAMES.filter(([bit]) => entry.mod & bit).map(([, n]) => n);
+      return [...mods, keyLabel].join('+');
+    }
+    case 'media': {
+      const a = MEDIA_ACTIONS.find((x) => x.entry.kind === 'media' && x.entry.usage === entry.usage);
+      return a?.short ?? a?.label ?? '?';
+    }
+    case 'mouse': {
+      const a = MOUSE_ACTIONS.find((x) => x.entry.kind === 'mouse'
+        && x.entry.ev === entry.ev && x.entry.val === entry.val);
+      return a?.short ?? a?.label ?? '?';
+    }
+    case 'macro':
+      return `Makro ${entry.slot}`;
+  }
+}

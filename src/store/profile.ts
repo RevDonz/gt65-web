@@ -199,16 +199,63 @@ function parseSettings(v: unknown): Settings {
 }
 
 /**
+ * VERSION 1 tidak punya `provenance`/`backedUp` — keduanya ditambahkan saat
+ * VERSION dinaikkan ke 2. Sebelum fungsi ini ada, profil v1 tersimpan
+ * gagal pemeriksaan versi di `parseProfile` dan `loadProfile` diam-diam
+ * menimpanya dengan `defaultProfile()` — pada keyboard yang tidak bisa
+ * dibaca balik, itu MEMBUANG satu-satunya catatan konfigurasi pengguna.
+ *
+ * Migrasi di sini mempertahankan `layers`/`lighting`/`settings`/`name` apa
+ * adanya (lewat pemeriksa bentuk yang sama dengan v2, supaya profil yang
+ * bentuknya salah tetap jatuh ke `defaultProfile()`, bukan lolos setengah
+ * matang) dan secara eksplisit menyatakan:
+ *
+ * - `provenance: 'edited'` — profil v1 tersimpan hanya ada karena seseorang
+ *   pernah menyunting/menyimpannya; menandainya `'default'` akan membuat
+ *   `needsOverwriteWarning` salah baca profil yang sudah disentuh sebagai
+ *   belum pernah disentuh, dan melewatkan peringatan menimpa yang justru
+ *   dibutuhkan di sini.
+ * - `backedUp: false` — v1 tidak melacak status cadangan sama sekali.
+ */
+function migrateV1(p: Record<string, unknown>): Profile {
+  if (typeof p.name !== 'string') {
+    fail('Profil rusak: nama profil bukan teks.');
+  }
+  if (typeof p.layers !== 'object' || p.layers === null) {
+    fail('Profil rusak: blok layer tidak ada.');
+  }
+  const layers = p.layers as Record<string, unknown>;
+  return {
+    version: VERSION,
+    name: p.name,
+    provenance: 'edited',
+    backedUp: false,
+    layers: {
+      top: parseLayer(layers.top, 'utama'),
+      fn: parseLayer(layers.fn, 'Fn'),
+    },
+    lighting: parseLighting(p.lighting),
+    settings: parseSettings(p.settings),
+  };
+}
+
+/**
  * Satu-satunya gerbang masuk profil dari luar memori. Melempar `Error`
  * berbahasa Indonesia (UI menampilkannya apa adanya) dan mengembalikan
  * objek baru yang sudah dinormalkan — bukan referensi ke masukan — agar
  * field asing tidak ikut terbawa ke penyimpanan atau ke perangkat.
+ *
+ * VERSION 1 dimigrasi lewat `migrateV1` alih-alih ditolak — lihat doc
+ * comment-nya. Versi lain (bukan 1, bukan VERSION saat ini) tetap ditolak.
  */
 export function parseProfile(v: unknown): Profile {
   if (typeof v !== 'object' || v === null) {
     fail('Profil rusak: isinya bukan objek JSON.');
   }
   const p = v as Record<string, unknown>;
+  if (p.version === 1) {
+    return migrateV1(p);
+  }
   if (p.version !== VERSION) {
     fail(`Versi profil ${String(p.version)} tidak dikenal, harus ${VERSION}.`);
   }

@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { MEDIA_ACTIONS, SHORTCUTS, MOUSE_ACTIONS, HID_KEYS, HID_KEY_GROUPS, EXTRA_USAGES } from '../src/gt65/keycodes';
+import {
+  MEDIA_ACTIONS, SHORTCUTS, MOUSE_ACTIONS, HID_KEYS, HID_KEY_GROUPS, EXTRA_USAGES,
+  entryLabel, entriesEqual,
+} from '../src/gt65/keycodes';
 import { encodeEntry } from '../src/gt65/protocol';
+import type { Entry } from '../src/gt65/protocol';
 import { KEYS } from '../src/gt65/layout';
 
 describe('katalog aksi', () => {
@@ -105,5 +109,96 @@ describe('pemilih tombol juga menawarkan usage tanpa tombol fisik (F1-F12, Inser
     const hidKeyUsages = HID_KEYS.map((k) => k.usage);
     expect(new Set(hidKeyUsages).size).toBe(hidKeyUsages.length);
     expect(HID_KEYS.length).toBe(distinctSourceCount);
+  });
+});
+
+/**
+ * `entryLabel` adalah legenda utama keycap di tab Remap — apa yang SEKARANG
+ * dilakukan tombol, dalam bentuk sesingkat mungkin. Diuji lintas SEMUA
+ * jenis Entry (termasuk 'none' dan 'macro') dan dipastikan tidak pernah
+ * jatuh ke hex mentah, sesuai janji doc comment-nya.
+ */
+describe('entryLabel — legenda utama keycap', () => {
+  test('none → "Nonaktif"', () => {
+    expect(entryLabel({ kind: 'none' })).toBe('Nonaktif');
+  });
+
+  test('tombol biasa memakai label dari katalog pemilih (HID_KEYS)', () => {
+    const semicolon = KEYS.find((k) => k.name === ';')!;
+    expect(entryLabel({ kind: 'key', mod: 0, usage: semicolon.usage })).toBe(';');
+    const a = KEYS.find((k) => k.name === 'A')!;
+    expect(entryLabel({ kind: 'key', mod: 0, usage: a.usage })).toBe('A');
+  });
+
+  /**
+   * Skenario tepat yang diminta: titik-koma dipetakan ulang menjadi "A" —
+   * kepala tombol harus terbaca "A", bukan ";" dan bukan hex usage-nya.
+   */
+  test('tombol yang dipetakan ulang membaca hasilnya, bukan tombol fisiknya', () => {
+    const a = KEYS.find((k) => k.name === 'A')!;
+    expect(entryLabel({ kind: 'key', mod: 0, usage: a.usage })).toBe('A');
+  });
+
+  test('shortcut ber-modifier digabung ringkas dari MOD_NAMES + HID_KEYS', () => {
+    const winD = SHORTCUTS.find((s) => s.id === 'show_desktop')!.entry as
+      { kind: 'key'; mod: number; usage: number };
+    expect(entryLabel(winD)).toBe('Win+D');
+    const ctrlC = SHORTCUTS.find((s) => s.id === 'copy')!.entry as
+      { kind: 'key'; mod: number; usage: number };
+    expect(entryLabel(ctrlC)).toBe('Ctrl+C');
+  });
+
+  test('multimedia memakai bentuk singkat kalau ada, label penuh kalau tidak', () => {
+    expect(entryLabel({ kind: 'media', usage: 0xcd })).toBe('Play');   // play_pause
+    expect(entryLabel({ kind: 'media', usage: 0xe9 })).toBe('Vol+');   // vol_up
+    expect(entryLabel({ kind: 'media', usage: 0xe2 })).toBe('Bisu');   // mute
+    expect(entryLabel({ kind: 'media', usage: 0xb7 })).toBe('Stop');   // tanpa short, jatuh ke label
+  });
+
+  test('mouse memakai bentuk singkat kalau ada, label penuh kalau tidak', () => {
+    expect(entryLabel({ kind: 'mouse', ev: 1, val: 0x01 })).toBe('Klik kiri');
+    expect(entryLabel({ kind: 'mouse', ev: 3, val: 0x01 })).toBe('Scroll ↑'); // scroll_up
+  });
+
+  test('macro → "Makro <slot>"', () => {
+    expect(entryLabel({ kind: 'macro', slot: 3, mode: 0, repeat: 0 })).toBe('Makro 3');
+  });
+
+  test('tidak pernah menampilkan hex mentah, untuk entri apa pun di seluruh katalog', () => {
+    const all: Entry[] = [
+      { kind: 'none' },
+      { kind: 'macro', slot: 99, mode: 1, repeat: 2 },
+      ...KEYS.map((k): Entry => ({ kind: 'key', mod: 0, usage: k.usage })),
+      ...SHORTCUTS.map((s) => s.entry),
+      ...MEDIA_ACTIONS.map((a) => a.entry),
+      ...MOUSE_ACTIONS.map((a) => a.entry),
+      // Usage yang tidak dikenal katalog mana pun — harus tetap jatuh ke
+      // plakat non-hex, bukan "0x.." mentah.
+      { kind: 'key', mod: 0, usage: 0xff },
+      { kind: 'media', usage: 0xff },
+      { kind: 'mouse', ev: 1, val: 0xff },
+    ];
+    for (const e of all) {
+      expect(entryLabel(e)).not.toMatch(/0x/i);
+    }
+  });
+});
+
+describe('entriesEqual', () => {
+  test('sama kalau kind dan seluruh field kunci sama', () => {
+    expect(entriesEqual({ kind: 'none' }, { kind: 'none' })).toBe(true);
+    expect(entriesEqual(
+      { kind: 'key', mod: 0, usage: 4 }, { kind: 'key', mod: 0, usage: 4 })).toBe(true);
+    expect(entriesEqual(
+      { kind: 'macro', slot: 1, mode: 2, repeat: 3 },
+      { kind: 'macro', slot: 1, mode: 2, repeat: 3 })).toBe(true);
+  });
+
+  test('beda kalau kind beda atau salah satu field kunci beda', () => {
+    expect(entriesEqual({ kind: 'none' }, { kind: 'key', mod: 0, usage: 4 })).toBe(false);
+    expect(entriesEqual(
+      { kind: 'key', mod: 0, usage: 4 }, { kind: 'key', mod: 0, usage: 5 })).toBe(false);
+    expect(entriesEqual(
+      { kind: 'mouse', ev: 1, val: 1 }, { kind: 'mouse', ev: 3, val: 1 })).toBe(false);
   });
 });

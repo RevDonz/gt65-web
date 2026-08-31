@@ -131,6 +131,80 @@ describe('tab Remap', () => {
 });
 
 /**
+ * Bug asli: pengguna memetakan ulang titik-koma (;) ke "A" lalu tidak bisa
+ * melihat ATAU membatalkan perubahan itu — kepala tombol tetap terbaca ";"
+ * apa pun binding-nya, dan tidak ada cara mengembalikannya selain mencari
+ * ulang usage aslinya sendiri. Tes ini menutup keduanya: keycap harus
+ * menunjukkan apa yang SEKARANG terjadi (plus legenda asli sebagai
+ * pengingat), dan "Kembalikan ke default" harus mengembalikannya tanpa
+ * pengguna perlu tahu usage HID titik-koma sama sekali.
+ */
+describe('legenda keycap dan "Kembalikan ke default"', () => {
+  const findKey = (el: Element, name: string) =>
+    [...el.querySelectorAll('.kc')].find(
+      (b) => (b as HTMLElement).title.split(' ')[0] === name) as HTMLButtonElement;
+
+  const remapToA = async (el: Element) => {
+    const semicolon = findKey(el, ';');
+    await act(async () => { semicolon.click(); });
+    const aUsage = KEYS.find((k) => k.name === 'A')!.usage;
+    const select = el.querySelector('aside select') as HTMLSelectElement;
+    await act(async () => {
+      select.value = String(aUsage);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+
+  test('papan bawaan tidak menandai tombol mana pun sebagai berubah', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    expect(el.querySelectorAll('.kc[data-modified="true"]').length).toBe(0);
+    expect(el.querySelector('.kc-legend-orig')).toBeNull();
+    await cleanup();
+  });
+
+  test('memetakan ulang ; ke A: kepala tombol terbaca A, aksen menyala, legenda asli muncul', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await remapToA(el);
+
+    const key = findKey(el, ';'); // title tetap memakai nama fisik ";"
+    expect(key.dataset.modified).toBe('true');
+    expect(key.querySelector('.kc-legend')!.textContent).toBe('A');
+    expect(key.querySelector('.kc-legend-orig')!.textContent).toBe(';');
+    await cleanup();
+  });
+
+  test('"Kembalikan ke default": nonaktif pada tombol bawaan, aktif setelah diubah, dan memulihkannya', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+
+    const semicolon = findKey(el, ';');
+    await act(async () => { semicolon.click(); });
+    const restoreBtn = () => [...el.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Kembalikan ke default') as HTMLButtonElement;
+    expect(restoreBtn().disabled).toBe(true);
+
+    const aUsage = KEYS.find((k) => k.name === 'A')!.usage;
+    const select = el.querySelector('aside select') as HTMLSelectElement;
+    await act(async () => {
+      select.value = String(aUsage);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(restoreBtn().disabled).toBe(false);
+
+    await act(async () => { restoreBtn().click(); });
+    expect(restoreBtn().disabled).toBe(true);
+
+    const key = findKey(el, ';');
+    expect(key.dataset.modified).toBe('false');
+    expect(key.querySelector('.kc-legend')!.textContent).toBe(';');
+    expect(key.querySelector('.kc-legend-orig')).toBeNull();
+    await cleanup();
+  });
+});
+
+/**
  * Wiring App.tsx untuk OverwriteGuardModal. `needsOverwriteWarning` dan
  * `promoteProvenance` sudah diuji murni di profile.test.ts; tes di sini
  * memastikan App.tsx betul-betul memanggilnya di jalur "Terapkan layer

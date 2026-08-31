@@ -3,10 +3,22 @@ import type { ReactNode } from 'react';
 import { KeyboardGrid, BINDING_TAGS } from '../KeyboardGrid';
 import { KEYS } from '../../gt65/layout';
 import {
-  MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS, MODIFIERS,
+  MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS,
+  MOD_NAMES, entriesEqual,
 } from '../../gt65/keycodes';
 import type { Entry, Layer } from '../../gt65/protocol';
+import { defaultProfile } from '../../store/profile';
 import type { Profile } from '../../store/profile';
+
+/**
+ * Pemetaan bawaan tiap tombol per layer — dipakai KeyboardGrid untuk aksen
+ * "berubah dari bawaan" dan tombol "Kembalikan ke default" di bawah. Dibaca
+ * dari `defaultProfile()` (store/profile.ts) alih-alih diturunkan ulang di
+ * sini, supaya tetap satu sumber kebenaran dengan jalur pemulihan pabrik.
+ * Aman dihitung sekali di scope modul: `defaultProfile()` murni dan tidak
+ * bergantung pada state apa pun.
+ */
+const DEFAULT_LAYERS = defaultProfile().layers;
 
 /**
  * Nilai yang harus ditampilkan dropdown tombol untuk entri yang sedang
@@ -36,11 +48,6 @@ export function parseKeyChoice(raw: string): number | null {
   const usage = Number(raw);
   return Number.isInteger(usage) ? usage : null;
 }
-
-const MOD_NAMES: [number, string][] = [
-  [MODIFIERS.ctrl, 'Ctrl'], [MODIFIERS.shift, 'Shift'],
-  [MODIFIERS.alt, 'Alt'], [MODIFIERS.gui, 'Win'],
-];
 
 /**
  * Ringkasan binding yang sedang berlaku, ditampilkan di kepala inspektur.
@@ -77,7 +84,10 @@ export function RemapPanel({ profile, onChange, onApply }: {
   const [layer, setLayer] = useState<Layer>('top');
   const [selected, setSelected] = useState<number | null>(null);
   const entries = profile.layers[layer];
+  const defaultEntries = DEFAULT_LAYERS[layer];
   const key = selected === null ? undefined : KEYS.find((k) => k.keyIndex === selected);
+  const isModified = selected !== null
+    && !entriesEqual(entries[selected], defaultEntries[selected]);
 
   const assign = (e: Entry) => {
     if (selected === null) return;
@@ -119,7 +129,8 @@ export function RemapPanel({ profile, onChange, onApply }: {
       <div className={`grid gap-4 ${
         selected === null ? '' : 'lg:grid-cols-[minmax(0,1fr)_330px]'}`}>
         <div className="flex flex-col gap-3">
-          <KeyboardGrid entries={entries} selected={selected} onSelect={setSelected} />
+          <KeyboardGrid entries={entries} defaultEntries={defaultEntries}
+                        selected={selected} onSelect={setSelected} />
           <div className="flex flex-wrap items-center gap-4">
             {BINDING_TAGS.map((t) => (
               <span key={t.kind} className="flex items-center gap-1.5 text-[10px]
@@ -188,6 +199,17 @@ export function RemapPanel({ profile, onChange, onApply }: {
               </Group>
               <Group title="Lainnya">
                 <Btn onClick={() => assign({ kind: 'none' })}>Nonaktifkan</Btn>
+                {/*
+                  Ini yang dibutuhkan pengguna saat tidak bisa mengembalikan
+                  titik-koma: bawaan tombol ini sudah diketahui aplikasi dari
+                  layout.ts, jadi tidak perlu dicari lagi lewat dropdown.
+                  Nonaktif kalau tombol memang masih bawaan — tidak ada apa
+                  pun untuk dikembalikan.
+                */}
+                <Btn disabled={!isModified}
+                     onClick={() => assign(defaultEntries[selected as number])}>
+                  Kembalikan ke default
+                </Btn>
               </Group>
             </div>
           </aside>
@@ -206,9 +228,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Btn({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+function Btn({ onClick, children, disabled }: {
+  onClick: () => void; children: ReactNode; disabled?: boolean;
+}) {
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} disabled={disabled}
             className="btn justify-start text-left font-normal">
       {children}
     </button>

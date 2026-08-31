@@ -354,23 +354,78 @@ describe('loadProfile jatuh ke bawaan, bukan crash', () => {
     expect(loadProfile()).toEqual(defaultProfile());
   });
 
-  /**
-   * Profil tersimpan dari VERSION sebelumnya (sebelum provenance/backedUp
-   * ada) tidak boleh dibaca dengan field yang hilang — itu membuat
-   * `needsOverwriteWarning` salah baca `undefined` sebagai bukan 'default'
-   * dan melewatkan peringatan padahal profilnya sesungguhnya belum pernah
-   * disentuh di versi baru ini. VERSION yang dinaikkan membuat seluruh
-   * profil versi lama gagal validasi bersama-sama, jatuh bersih ke bawaan.
-   */
-  test('profil dari VERSION sebelumnya (tanpa provenance/backedUp) jatuh ke bawaan', () => {
-    store({
+});
+
+/**
+ * Commit yang menaikkan VERSION dari 1 ke 2 (menambah provenance/backedUp)
+ * tidak menyertakan migrasi — `loadProfile` melihat profil v1 tersimpan,
+ * gagal pemeriksaan versi, dan diam-diam menimpanya dengan
+ * `defaultProfile()`. Pada keyboard yang tidak bisa dibaca balik, profil
+ * tersimpan itu bisa jadi satu-satunya catatan konfigurasi pengguna —
+ * jadi v1 yang bentuknya sah harus DIMIGRASI, bukan dibuang. Lihat
+ * `migrateV1` di store/profile.ts.
+ */
+describe('migrasi profil versi 1', () => {
+  const store = (p: unknown) =>
+    localStorage.setItem('gt65.profile', JSON.stringify(p));
+  const valid = () => JSON.parse(exportProfile(defaultProfile()));
+
+  /** Profil v1 dengan isi yang jelas berbeda dari bawaan, supaya migrasi teruji betul-betul mempertahankan isi lama, bukan kebetulan cocok dengan defaultProfile(). */
+  function v1Profile(): Record<string, unknown> {
+    const base = valid();
+    const idx = KEYS[0].keyIndex;
+    base.layers.top[idx] = { kind: 'none' };
+    return {
       version: 1,
-      name: 'Lama',
-      layers: valid().layers,
-      lighting: valid().lighting,
-      settings: valid().settings,
-      // provenance dan backedUp sengaja tidak ada — bentuk skema lama.
-    });
+      name: 'Profil Lama',
+      layers: base.layers,
+      lighting: base.lighting,
+      settings: base.settings,
+      // provenance dan backedUp sengaja tidak ada — bentuk skema v1.
+    };
+  }
+
+  test('v1 yang sah dimigrasi lewat loadProfile, bukan dibuang', () => {
+    const v1 = v1Profile();
+    store(v1);
+    const loaded = loadProfile();
+    expect(loaded.version).toBe(2);
+    expect(loaded.provenance).toBe('edited');
+    expect(loaded.backedUp).toBe(false);
+    expect(loaded.name).toBe('Profil Lama');
+    // Isi layer benar-benar dipertahankan, termasuk perubahan yang
+    // membedakannya dari defaultProfile().
+    expect(loaded.layers).toEqual(v1.layers);
+    expect(loaded.lighting).toEqual(v1.lighting);
+    expect(loaded.settings).toEqual(v1.settings);
+  });
+
+  test('v1 yang bentuknya rusak tetap jatuh ke bawaan', () => {
+    const v1 = v1Profile();
+    delete (v1 as { lighting?: unknown }).lighting;
+    store(v1);
     expect(loadProfile()).toEqual(defaultProfile());
+  });
+
+  test('v1 yang layer-nya kependekan tetap jatuh ke bawaan', () => {
+    const v1 = v1Profile();
+    (v1.layers as { top: unknown[] }).top.pop();
+    store(v1);
+    expect(loadProfile()).toEqual(defaultProfile());
+  });
+
+  test('berkas ekspor v1 lama tetap bisa diimpor', () => {
+    const v1 = v1Profile();
+    const imported = importProfile(JSON.stringify(v1));
+    expect(imported.version).toBe(2);
+    // Impor selalu menandai provenance/backedUp sendiri, sama seperti v2.
+    expect(imported.provenance).toBe('imported');
+    expect(imported.backedUp).toBe(true);
+    expect(imported.name).toBe('Profil Lama');
+    expect(imported.layers).toEqual(v1.layers);
+  });
+
+  test('versi yang bukan 1 maupun VERSION saat ini tetap ditolak', () => {
+    expect(() => importProfile('{"version":99}')).toThrow(/versi/i);
   });
 });

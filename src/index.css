@@ -95,6 +95,8 @@ body {
 .btn:hover { color: var(--ink); border-color: var(--ink-3); }
 .btn:active { background: var(--panel); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { color: var(--ink-2); border-color: var(--edge-bright); }
 
 /* Satu-satunya tempat tembaga dipakai di luar rail dan tester. */
 .btn-primary {
@@ -296,6 +298,44 @@ body {
   width: 4px;
   height: 4px;
   border-radius: 999px;
+}
+
+/*
+ * Legenda asli (tercetak di keycap fisik, dari layout.ts), pojok
+ * berlawanan dari legenda utama supaya tidak bertabrakan — kecil dan
+ * redup karena ia cuma pengingat, bukan info utama. Hanya dirender saat
+ * tombolnya memang berubah dari bawaan dan hasilnya berbeda dari cetakan
+ * aslinya (lihat KeyboardGrid.tsx).
+ */
+.kc-legend-orig {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  max-width: 60%;
+  font-size: 6px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Aksen tipis di tepi bawah muka keycap: satu-satunya penanda yang
+ * membuat tombol yang berubah bisa dihitung sekilas tanpa membaca tiap
+ * legenda — penting terutama untuk entri jenis 'key' yang tidak pernah
+ * dapat titik `.kc-tag` (lihat BINDING_TAGS).
+ */
+.kc-modified {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .kc[data-interactive='true']:hover .kc-face { background: linear-gradient(180deg, #4c4658, #3a3543); }

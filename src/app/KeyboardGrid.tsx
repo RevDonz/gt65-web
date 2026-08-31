@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { KEYS, LAYOUT_SIZE } from '../gt65/layout';
 import type { Entry } from '../gt65/protocol';
+import { entryLabel, entriesEqual } from '../gt65/keycodes';
 
 /**
  * Penanda jenis binding. Sengaja hanya setitik 4px di pojok muka keycap,
@@ -94,6 +95,14 @@ function useFitScale() {
 export type KeyboardGridProps = {
   /** Binding per keyIndex; kosong di Tester yang tidak menampilkan binding. */
   entries?: Entry[];
+  /**
+   * Pemetaan bawaan pabrik per keyIndex, untuk layer yang sama dengan
+   * `entries`. Dipakai membandingkan apakah suatu tombol sudah diubah —
+   * aksen tipis di tepi bawah keycap, dan legenda asli di pojok (lihat
+   * render di bawah). Hanya berlaku kalau `entries` juga diisi; Tester
+   * tidak mengirim keduanya sehingga tidak menampilkan salah satunya.
+   */
+  defaultEntries?: Entry[];
   /** keyIndex yang sedang dipilih di Remap. */
   selected?: number | null;
   /** Tanpa ini papan hanya tampilan (Tester), tidak bisa diklik. */
@@ -107,7 +116,7 @@ export type KeyboardGridProps = {
 };
 
 export function KeyboardGrid({
-  entries, selected = null, onSelect,
+  entries, defaultEntries, selected = null, onSelect,
   heldUsages, seenUsages, reveal = true,
 }: KeyboardGridProps) {
   const { ref, scale } = useFitScale();
@@ -128,6 +137,18 @@ export function KeyboardGrid({
           const locked = interactive && !isRemappable(k.usage);
           const held = heldUsages?.has(k.usage) ?? false;
           const seen = !held && (seenUsages?.has(k.usage) ?? false);
+          // Legenda utama = apa yang SEKARANG dilakukan tombol ini, bukan
+          // apa yang tercetak di kepalanya. Tanpa `entries` (Tester) tidak
+          // ada binding untuk dibaca, jadi tetap tampilkan nama fisiknya.
+          const label = entries ? entryLabel(e) : k.name;
+          const def = defaultEntries?.[k.keyIndex];
+          const modified = entries !== undefined && def !== undefined
+            && !entriesEqual(e, def);
+          // Legenda asli hanya muncul kalau tombolnya memang berubah DAN
+          // hasilnya benar-benar berbeda dari yang tercetak — papan yang
+          // belum disentuh tetap bersih, tidak menampilkan tiap legenda dua
+          // kali (lihat kondisi `modified` di atas).
+          const showOriginal = modified && label !== k.name;
           return (
             <button key={k.keyIndex} type="button"
               onClick={interactive && !locked ? () => onSelect(k.keyIndex) : undefined}
@@ -144,13 +165,16 @@ export function KeyboardGrid({
               data-locked={locked}
               data-held={held}
               data-seen={seen}
+              data-modified={modified}
               style={{
                 left: k.x, top: k.y, width: k.w, height: k.h,
                 '--row': rowIndex(k.y),
               } as CSSProperties}>
               <span className="kc-face">
-                <span className="kc-legend">{k.name}</span>
+                <span className="kc-legend">{label}</span>
+                {showOriginal && <span className="kc-legend-orig">{k.name}</span>}
                 {tag && <span className="kc-tag" style={{ background: tag }} />}
+                {modified && <span className="kc-modified" />}
               </span>
             </button>
           );
