@@ -27,10 +27,20 @@ export function App() {
   const [tab, setTab] = useState<Tab>('Lampu');
   const [profile, setProfileState] = useState<Profile>(loadProfile);
   const [importError, setImportError] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dev = useDevice(dryRun);
 
-  const setProfile = (p: Profile) => { setProfileState(p); saveProfile(p); };
+  /**
+   * Tiap suntingan panel langsung tersimpan; tidak ada tombol simpan
+   * manual. localStorage masih salinan utama profil, jadi kegagalan
+   * menyimpan berarti suntingan bisa hilang saat halaman dimuat ulang —
+   * itu harus terlihat, bukan ditelan diam-diam.
+   */
+  const setProfile = (p: Profile) => {
+    setProfileState(p);
+    setSaveFailed(!saveProfile(p));
+  };
 
   const handleExport = () => {
     const json = exportProfile(profile);
@@ -71,10 +81,15 @@ export function App() {
         <RestoreButton onRestore={async () => {
           const d = defaultProfile();
           setProfile(d);
-          await dev.send(remap('top', d.layers.top));
-          await dev.send(remap('fn', d.layers.fn));
-          await dev.send(lighting(d.lighting));
-          await dev.send(settings(d.settings));
+          // Satu panggilan berisi empat transaksi: tetap dikirim terpisah
+          // dan berurutan, tapi pratinjau mode kering memperlihatkan
+          // keempatnya sekaligus.
+          await dev.send(
+            remap('top', d.layers.top),
+            remap('fn', d.layers.fn),
+            lighting(d.lighting),
+            settings(d.settings),
+          );
         }} />
         <button onClick={handleExport}
                 className="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800">
@@ -90,6 +105,15 @@ export function App() {
       {importError && (
         <p className="px-6 text-sm text-rose-400">Gagal impor profil: {importError}</p>
       )}
+      {saveFailed && (
+        <p className="mx-6 rounded border border-rose-700 bg-rose-950/50 p-2
+                      text-sm text-rose-300">
+          <strong>Perubahan tidak tersimpan di browser.</strong> Penyimpanan
+          penuh atau diblokir. Profil masih aktif di memori dan masih bisa
+          diterapkan ke keyboard, tapi akan hilang saat halaman dimuat ulang —
+          klik <em>Ekspor profil</em> sekarang untuk menyimpannya sebagai berkas.
+        </p>
+      )}
       <main className="px-6 pb-10">
         {tab === 'Remap' && (
           <RemapPanel profile={profile} onChange={setProfile}
@@ -104,10 +128,6 @@ export function App() {
                          onApply={() => dev.send(settings(profile.settings))} />
         )}
         {tab === 'Monitor' && <MonitorPanel device={dev.device} />}
-        <button onClick={() => setProfile({ ...profile, name: profile.name })}
-                className="mt-4 rounded border border-slate-600 px-3 py-1">
-          Simpan profil
-        </button>
         {dev.lastPackets.length > 0 && (
           <pre className="mt-6 overflow-x-auto rounded bg-slate-950 p-4 text-xs">
             {formatHex(dev.lastPackets)}

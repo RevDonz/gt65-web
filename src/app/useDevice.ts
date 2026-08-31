@@ -37,8 +37,17 @@ export function useDevice(dryRun: boolean) {
     }
   }, []);
 
-  const send = useCallback(async (packets: Uint8Array[]) => {
-    setLastPackets(packets);
+  /**
+   * Menerima satu transaksi atau beberapa sekaligus. Beberapa transaksi
+   * tetap dikirim terpisah dan berurutan — persis seperti software vendor —
+   * tapi pratinjau mode kering menampilkan gabungan semuanya. Sebelumnya
+   * tiap transaksi menimpa `lastPackets`, sehingga pemulihan bawaan (dua
+   * remap 13 paket, pencahayaan, pengaturan) hanya memperlihatkan 4 paket
+   * terakhir: justru dua penulisan terbesar yang tak pernah terlihat oleh
+   * pengguna yang sedang meninjau operasi paling berisiko di aplikasi ini.
+   */
+  const send = useCallback(async (...transactions: Uint8Array[][]) => {
+    setLastPackets(transactions.flat());
     switch (sendDecision(dryRun, device)) {
       case 'dry':
         return;
@@ -48,7 +57,12 @@ export function useDevice(dryRun: boolean) {
       case 'send':
         setError(null);
         try {
-          await sendTransaction(device as HIDDevice, packets);
+          // Berhenti di kegagalan pertama: melanjutkan penulisan setelah
+          // satu transaksi gagal hanya menambah keadaan yang tak diketahui
+          // pada perangkat yang tidak bisa dibaca balik.
+          for (const t of transactions) {
+            await sendTransaction(device as HIDDevice, t);
+          }
         } catch (e) {
           setError(`Gagal mengirim: ${String(e)}`);
         }
