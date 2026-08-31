@@ -106,6 +106,25 @@ Tombol **Pulihkan bawaan** menulis ulang seluruh konfigurasi ke keadaan
 wajar. Tidak ada perintah reset pabrik di protokol keyboard — software vendor
 pun melakukan hal yang sama, sehingga pemulihan tidak memerlukan Windows.
 
+**Peringatan: belum terverifikasi di hardware.** Tombol Pulihkan bawaan belum
+pernah diuji pada perangkat fisik. Dua asumsi tentang tombol Fn masih
+menunggu konfirmasi (lihat doc comment `defaultProfile()` di
+`src/store/profile.ts`):
+
+1. Tombol Fn ditulis sebagai `usage:0xAF` mengikuti XML vendor, padahal `0xAF`
+   adalah Reserved di HID Keyboard usage page — penanda internal vendor, bukan
+   usage HID asli. Belum diketahui apakah firmware memperlakukannya sebagai
+   tombol layer atau tombol mati.
+2. Layer Fn ditulis nol seluruhnya. Spec Bagian 5.5 menyebut `0x00` sebagai
+   "default / nonaktif" — dua makna berlawanan. **Kalau maksudnya "nonaktif",
+   pemulihan ini menghapus layer Fn pabrik secara permanen,** dan aplikasi
+   tidak bisa membangunnya kembali.
+
+Ikuti `docs/hardware-checklist.md` Task 14 sebelum menekan tombol ini: catat
+daftar kombinasi Fn yang berfungsi (Fn + media, kecerahan, panah, Del, PrtSc,
+dst.), terapkan pemulihan, lalu uji ulang. Kalau ada yang patah, **berhenti
+dan laporkan** — jangan lanjut sampai asumsi Fn dipastikan.
+
 ## Dokumentasi
 
 - `docs/superpowers/specs/` — desain dan spesifikasi protokol lengkap
