@@ -28,7 +28,11 @@ document.getElementById('go').onclick = async () => {
 
     try {
       const view = await d.receiveFeatureReport(0);
-      const hex = [...new Uint8Array(view.buffer)]
+      // `new Uint8Array(view.buffer)` mengabaikan byteOffset/byteLength dan
+      // membaca seluruh ArrayBuffer di baliknya — dump yang tergeser atau
+      // ter-padding akan salah dibaca. Keluaran halaman inilah yang
+      // memutuskan apakah perangkat write-only, jadi harus persis.
+      const hex = [...new Uint8Array(view.buffer, view.byteOffset, view.byteLength)]
         .map(b => b.toString(16).padStart(2, '0')).join(' ');
       L('  receiveFeatureReport(0): BERHASIL — perangkat BISA dibaca');
       L('  ' + hex);
