@@ -3,7 +3,8 @@ import { DeviceBar } from './DeviceBar';
 import { useDevice } from './useDevice';
 import { formatHex } from './hex';
 import { LightingPanel } from './panels/LightingPanel';
-import { lighting } from '../gt65/protocol';
+import { SettingsPanel } from './panels/SettingsPanel';
+import { lighting, settings } from '../gt65/protocol';
 import { loadProfile, saveProfile } from '../store/profile';
 import type { Profile } from '../store/profile';
 
@@ -36,7 +37,11 @@ export function App() {
           <LightingPanel profile={profile} onChange={setProfile}
                          onApply={() => dev.send(lighting(profile.lighting))} />
         )}
-        {tab !== 'Lampu' && (
+        {tab === 'Pengaturan' && (
+          <SettingsPanel profile={profile} onChange={setProfile}
+                         onApply={() => dev.send(settings(profile.settings))} />
+        )}
+        {tab !== 'Lampu' && tab !== 'Pengaturan' && (
           <p className="text-slate-400">
             Profil <strong>{profile.name}</strong> — tab {tab}, panel diisi pada task berikutnya.
           </p>
