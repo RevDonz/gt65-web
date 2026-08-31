@@ -5,7 +5,8 @@ import { formatHex } from './hex';
 import { LightingPanel } from './panels/LightingPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { MonitorPanel } from './panels/MonitorPanel';
-import { lighting, settings } from '../gt65/protocol';
+import { RemapPanel } from './panels/RemapPanel';
+import { lighting, settings, remap } from '../gt65/protocol';
 import { loadProfile, saveProfile } from '../store/profile';
 import type { Profile } from '../store/profile';
 
@@ -34,6 +35,10 @@ export function App() {
         ))}
       </nav>
       <main className="px-6 pb-10">
+        {tab === 'Remap' && (
+          <RemapPanel profile={profile} onChange={setProfile}
+                      onApply={(l) => dev.send(remap(l, profile.layers[l]))} />
+        )}
         {tab === 'Lampu' && (
           <LightingPanel profile={profile} onChange={setProfile}
                          onApply={() => dev.send(lighting(profile.lighting))} />
@@ -43,11 +48,6 @@ export function App() {
                          onApply={() => dev.send(settings(profile.settings))} />
         )}
         {tab === 'Monitor' && <MonitorPanel device={dev.device} />}
-        {tab !== 'Lampu' && tab !== 'Pengaturan' && tab !== 'Monitor' && (
-          <p className="text-slate-400">
-            Profil <strong>{profile.name}</strong> — tab {tab}, panel diisi pada task berikutnya.
-          </p>
-        )}
         <button onClick={() => setProfile({ ...profile, name: profile.name })}
                 className="mt-4 rounded border border-slate-600 px-3 py-1">
           Simpan profil
