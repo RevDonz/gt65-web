@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { onVendorInput } from '../../gt65/device';
 
-type Line = { at: string; hex: string; index: number };
+type Line = { at: string; hex: string; index: number | undefined };
 
 export function MonitorPanel({ device }: { device: HIDDevice | null }) {
   const [lines, setLines] = useState<Line[]>([]);
@@ -12,7 +12,19 @@ export function MonitorPanel({ device }: { device: HIDDevice | null }) {
       setLines((prev) => [{
         at: new Date().toLocaleTimeString(),
         hex: [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(' '),
-        index: bytes[1] ?? 0,
+        // SELISIH BELUM DIPUTUSKAN: kode ini membaca `bytes[1]`, sedangkan
+        // spec Bagian 5.6 menyebut `payload[2]` yang berisi indeks aksi.
+        // Bagian 5.1 menegaskan seluruh offset di dokumen itu memakai
+        // koordinat payload, jadi keduanya sungguh berselisih satu byte —
+        // salah satunya keliru dan tidak ada yang tahu mana.
+        //
+        // Sengaja tidak diubah sepihak. Ini murni tampilan: nilainya tidak
+        // pernah dikirim ke perangkat, dan hex mentah ditampilkan di
+        // sebelahnya sehingga tidak ada yang tersembunyi. Laporan Report ID 5
+        // hanya 3 byte, jadi satu penekanan tombol di langkah hardware
+        // Task 12 langsung memperlihatkan byte mana yang berubah dan
+        // menyelesaikan selisihnya. Lihat docs/hardware-checklist.md.
+        index: bytes[1],
       }, ...prev].slice(0, 200));
     });
     return stop;
@@ -33,7 +45,9 @@ export function MonitorPanel({ device }: { device: HIDDevice | null }) {
       </div>
       <ul className="max-h-96 overflow-y-auto rounded bg-slate-950 p-3 font-mono text-xs">
         {lines.map((l, i) => (
-          <li key={i}>{l.at} · indeks {l.index} · {l.hex}</li>
+          <li key={i}>
+            {l.at} · indeks {l.index ?? '(di luar laporan)'} · {l.hex}
+          </li>
         ))}
       </ul>
     </section>

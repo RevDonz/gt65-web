@@ -112,6 +112,17 @@ Buka tab Monitor dengan keyboard tersambung. Kalau ada tombol yang sudah
 dipetakan ke aksi sisi PC oleh software vendor, menekannya memunculkan baris.
 Daftar kosong juga hasil yang sah — catat saja.
 
+**Kalau ada baris yang muncul, selesaikan sekalian selisih offset ini.**
+`MonitorPanel` membaca indeks aksi dari `bytes[1]`, sedangkan spec Bagian 5.6
+menyebut `payload[2]` — dan Bagian 5.1 menegaskan seluruh offset spec memakai
+koordinat payload, jadi keduanya sungguh berselisih satu byte. Salah satunya
+keliru dan belum ada yang tahu mana.
+
+Laporannya cuma 3 byte, jadi hex mentah di tiap baris sudah cukup: tekan tombol
+yang sama dua kali dan lihat byte ke berapa yang berubah. Perbaiki sisi yang
+salah — kode atau spec — lalu hapus komentar penanda di
+`src/app/panels/MonitorPanel.tsx`.
+
 ### Task 13 langkah 4: remap
 
 Penulisan paling berisiko. **Ekspor profil sebagai cadangan lebih dulu.**
