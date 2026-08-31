@@ -8,10 +8,10 @@ const DECISION_LABEL: Record<LogEntry['decision'], string> = {
   send: 'Terkirim',
 };
 
-const DECISION_CLASS: Record<LogEntry['decision'], string> = {
-  dry: 'text-slate-400',
-  nodevice: 'text-amber-400',
-  send: 'text-emerald-400',
+const DECISION_COLOR: Record<LogEntry['decision'], string> = {
+  dry: 'var(--ink-3)',
+  nodevice: 'var(--warn)',
+  send: 'var(--ok)',
 };
 
 function downloadFilename(): string {
@@ -21,11 +21,11 @@ function downloadFilename(): string {
 
 function ReadbackBadge({ readbacks }: { readbacks: LogEntry['readbacks'] }) {
   if (readbacks.length === 0) {
-    return <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-400">baca balik: tidak dicoba</span>;
+    return <span className="rounded-[3px] bg-[var(--panel-2)] px-2 py-0.5 text-[var(--ink-3)]">baca balik: tidak dicoba</span>;
   }
   const gagal = readbacks.filter((r) => r.hex === '').length;
   return (
-    <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">
+    <span className="rounded-[3px] bg-[var(--panel-2)] px-2 py-0.5 text-[var(--ink-2)]">
       baca balik: {readbacks.length} paket{gagal > 0 ? ` (${gagal} gagal dibaca)` : ''}
     </span>
   );
@@ -40,20 +40,20 @@ function ReadbackBadge({ readbacks }: { readbacks: LogEntry['readbacks'] }) {
 function ReadbackTable({ readbacks }: { readbacks: LogEntry['readbacks'] }) {
   if (readbacks.length === 0) return null;
   return (
-    <table className="mt-2 w-full table-fixed border-collapse text-xs">
+    <table className="mt-2 w-full table-fixed border-collapse text-[11px]">
       <thead>
-        <tr className="text-slate-400">
-          <th className="w-12 text-left font-normal">paket</th>
+        <tr className="text-[var(--ink-3)]">
+          <th className="w-14 text-left font-normal">paket</th>
           <th className="w-16 text-left font-normal">status</th>
           <th className="text-left font-normal">balikan (hex)</th>
         </tr>
       </thead>
       <tbody>
         {readbacks.map((r, i) => (
-          <tr key={i} className="border-t border-slate-800">
-            <td className="py-1 text-slate-400">{i + 1}/{readbacks.length}</td>
-            <td className="py-1">{r.status === null ? '—' : r.status}</td>
-            <td className="py-1 truncate text-slate-300">{r.hex || '(gagal dibaca)'}</td>
+          <tr key={i} className="border-t border-[var(--edge)]">
+            <td className="py-1 text-[var(--ink-2)]">{i + 1}/{readbacks.length}</td>
+            <td className="num py-1">{r.status === null ? '—' : r.status}</td>
+            <td className="num truncate py-1 text-[var(--ink-2)]">{r.hex || '(gagal dibaca)'}</td>
           </tr>
         ))}
       </tbody>
@@ -92,42 +92,44 @@ export function LogPanel({ entries, dryRun, productName }: {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
+        <span className="label">Log transaksi</span>
         <button onClick={handleCopy}
-                className="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800">
+                className="btn">
           Salin log
         </button>
         <button onClick={handleDownload}
-                className="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800">
+                className="btn">
           Unduh log
         </button>
-        <span className="text-slate-400">{entries.length} entri</span>
-        {copyStatus && <span className="text-sm text-slate-400">{copyStatus}</span>}
+        <span className="num text-[11px] text-[var(--ink-3)]">{entries.length} entri</span>
+        {copyStatus && <span className="text-[12px] text-[var(--ink-2)]">{copyStatus}</span>}
       </div>
 
       {entries.length === 0 ? (
-        <p className="text-slate-400">
+        <p className="panel px-4 py-3 text-[12px] text-[var(--ink-2)]">
           Belum ada transaksi. Klik salah satu tombol "Terapkan" di tab lain.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {entries.map((e, i) => (
-            <li key={i} className="rounded border border-slate-700 bg-slate-950 p-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-slate-400">{new Date(e.at).toLocaleString()}</span>
+            <li key={i} className="panel p-3">
+              <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                <span className="num text-[10px] text-[var(--ink-3)]">{new Date(e.at).toLocaleString()}</span>
                 <span className="font-semibold">{e.label}</span>
-                <span className={DECISION_CLASS[e.decision]}>{DECISION_LABEL[e.decision]}</span>
-                <span className="text-slate-400">{e.packetCount} paket</span>
-                <span className={e.outcome === 'ok' ? 'text-emerald-400' : 'text-rose-400'}>
+                <span style={{ color: DECISION_COLOR[e.decision] }}>{DECISION_LABEL[e.decision]}</span>
+                <span className="text-[var(--ink-3)]">{e.packetCount} paket</span>
+                <span style={{ color: e.outcome === 'ok' ? 'var(--ok)' : 'var(--crit)' }}>
                   {e.outcome === 'ok' ? 'berhasil' : e.outcome}
                 </span>
                 <ReadbackBadge readbacks={e.readbacks} />
               </div>
               <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-slate-400">
+                <summary className="cursor-pointer text-[11px] text-[var(--ink-2)]">
                   Detail paket &amp; balikan
                 </summary>
                 <ReadbackTable readbacks={e.readbacks} />
-                <pre className="mt-2 overflow-x-auto rounded bg-slate-900 p-3 text-xs">
+                <pre className="well num mt-2 overflow-x-auto p-3 text-[10px] leading-[1.7]
+                                text-[var(--ink-2)]">
                   {e.packetsHex}
                 </pre>
               </details>

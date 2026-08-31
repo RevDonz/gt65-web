@@ -39,24 +39,27 @@ export function SettingsPanel({ profile, onChange, onApply }: {
   };
 
   return (
-    <section className="flex max-w-md flex-col gap-4">
+    <section className="panel flex max-w-xl flex-col gap-4 p-4">
+      <div className="label">Pengaturan perangkat</div>
       {s.flags.map((v, i) => (
-        <label key={i} className="flex items-center gap-3">
-          <input type="checkbox" checked={v}
+        <label key={i} className="flex items-center gap-3 text-[12px]">
+          <input type="checkbox" checked={v} className="accent-[var(--ok)]"
                  onChange={(e) => setFlag(i, e.target.checked)} />
-          Flag byte {i + 1} <span className="text-slate-500">(belum diberi nama)</span>
+          <span className="num text-[11px] text-[var(--ink-2)]">flag[{i + 1}]</span>
+          <span className="text-[var(--ink-3)]">belum diberi nama</span>
         </label>
       ))}
 
-      <label className="flex items-center justify-between gap-4">
-        Waktu tidur lampu
+      <label className="flex items-center justify-between gap-4 border-t
+                        border-[var(--edge)] pt-4">
+        <span className="label">Waktu tidur lampu</span>
         <select value={String(s.sleepTimeout)}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   if (!Number.isInteger(v)) return;
                   onChange({ ...profile, settings: { ...s, sleepTimeout: v } });
                 }}
-                className="w-40 rounded bg-slate-800 px-2 py-1">
+                className="field w-40">
           {SLEEP_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -67,13 +70,13 @@ export function SettingsPanel({ profile, onChange, onApply }: {
           )}
         </select>
       </label>
-      <p className="-mt-2 text-xs text-slate-500">
+      <p className="-mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
         Vendor hanya menawarkan empat pilihan ini. Nilai byte di baliknya
         belum dipastikan di hardware.
       </p>
 
       <button onClick={onApply}
-              className="rounded bg-emerald-700 px-4 py-2 hover:bg-emerald-600">
+              className="btn btn-primary">
         Terapkan pengaturan
       </button>
     </section>

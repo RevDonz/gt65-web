@@ -1,1 +1,362 @@
 @import "tailwindcss";
+
+/* =======================================================================
+   GT65 — panel instrumen presisi
+   Referensi visualnya adalah muka depan audio interface / osiloskop:
+   aluminium anodisasi, pelabelan teknis, komponen yang terasa fisik.
+   Bukan RGB gamer, bukan dasbor admin generik.
+   ======================================================================= */
+
+:root {
+  --ground:      #16151a;
+  --panel:       #1d1c22;
+  --panel-2:     #26242c;
+  --edge:        #322f39;
+  --edge-bright: #443f4d;
+  --ink:         #ece9f0;
+  --ink-2:       #a49eae;
+  --ink-3:       #6f6a79;
+  --accent:      #e0904f;
+  --accent-dim:  #8a5a31;
+  --ok:          #4fae9d;
+  --warn:        #d0a54a;
+  --crit:        #d9686c;
+
+  --font-ui: 'Archivo', 'Helvetica Neue', 'Arial Narrow', Arial, sans-serif;
+  --font-num: 'Martian Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Angka, hex dump, dan pembacaan status. Lebar, jadi dipakai hemat. */
+.num {
+  font-family: var(--font-num);
+  font-size: 0.82em;
+  letter-spacing: -0.02em;
+}
+
+/* Label teknis kecil di atas kelompok kontrol. */
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------------- pelat */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+}
+
+/* Sumur: bidang cekung untuk isi yang "masuk ke dalam" panel. */
+.well {
+  background: var(--ground);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.hairline { border-color: var(--edge); }
+
+/* --------------------------------------------------------------- tombol */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--edge-bright);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+              background-color 120ms ease-out;
+}
+.btn:hover { color: var(--ink); border-color: var(--ink-3); }
+.btn:active { background: var(--panel); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Satu-satunya tempat tembaga dipakai di luar rail dan tester. */
+.btn-primary {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  color: #1a1206;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.btn-primary:hover { color: #1a1206; border-color: var(--accent); filter: brightness(1.08); }
+
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+}
+.btn-quiet:hover { border-color: var(--edge-bright); background: var(--panel-2); }
+
+/* --------------------------------------------------------------- isian */
+
+.field {
+  padding: 5px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.field:focus { outline: none; border-color: var(--accent-dim); }
+.field.num { font-family: var(--font-num); }
+
+/* ------------------------------------------------------------ rail kiri */
+
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 4px 8px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 120ms ease-out, background-color 120ms ease-out;
+}
+.rail-item:hover { color: var(--ink-2); background: rgba(255, 255, 255, 0.025); }
+.rail-item[aria-selected='true'] {
+  border-left-color: var(--accent);
+  background: var(--panel-2);
+  color: var(--ink);
+}
+.rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ------------------------------------------------------- status & strip */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel-2);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ink-3);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  flex: none;
+}
+.dot[data-state='connecting'] { background: var(--warn); }
+.dot[data-state='connected']  { background: var(--ok); box-shadow: 0 0 6px rgba(79, 174, 157, 0.7); }
+.dot[data-state='error']      { background: var(--crit); }
+
+/* Sakelar mode kering: harus tak terlewat, bukan checkbox mungil. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 4px;
+  border: 1px solid var(--edge-bright);
+  border-radius: 999px;
+  background: var(--panel-2);
+  cursor: pointer;
+  user-select: none;
+}
+.switch-track {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--ground);
+  border: 1px solid var(--edge-bright);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+  flex: none;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--ink-3);
+  transition: transform 140ms ease-out, background-color 140ms ease-out;
+}
+.switch[data-on='true'] { border-color: var(--accent-dim); }
+.switch[data-on='true'] .switch-knob { transform: translateX(16px); background: var(--accent); }
+.switch[data-on='false'] .switch-knob { background: var(--crit); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.strip {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 18px;
+  border-top: 1px solid var(--edge);
+  font-size: 11px;
+}
+.strip[data-mode='dry'] {
+  border-top-color: var(--accent);
+  background: rgba(224, 144, 79, 0.06);
+  color: var(--ink-2);
+}
+.strip[data-mode='live'] {
+  border-top-color: var(--crit);
+  background: rgba(217, 104, 108, 0.08);
+  color: #eab5b7;
+}
+
+/* -------------------------------------------------------------- keycap */
+
+/*
+ * Dua lapis: cangkang luar (sisi keycap) dan muka atas yang masuk 2px dari
+ * tiap tepi. Muka atas membawa sorotan 1px di tepi atasnya dan bayangan
+ * lembut di bawahnya, jadi ia terbaca sebagai permukaan yang menonjol.
+ * Ditekan/dipilih: muka turun 1px dan bayangannya mengecil.
+ */
+.kc {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #35323d, #221f28);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  cursor: default;
+}
+.kc[data-interactive='true'] { cursor: pointer; }
+.kc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.kc-face {
+  position: absolute;
+  inset: 2px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #423d4c, #322e3a);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 2px 3px rgba(0, 0, 0, 0.55);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out,
+              background 120ms ease-out;
+}
+
+/* Legenda duduk di kiri-atas muka, seperti keycap sungguhan. */
+.kc-legend {
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: #d5d0dc;
+  text-align: left;
+  overflow: hidden;
+  /* Nama panjang seperti "page up" dibiarkan turun baris, bukan dipotong:
+     legenda yang terbaca separuh ("pag…") membuat papan sulit dibaca
+     sekilas, padahal itu satu-satunya penanda tombol mana yang mana. */
+  overflow-wrap: break-word;
+}
+
+/* Penanda jenis binding, sekecil mungkin supaya warna tidak menyebar. */
+.kc-tag {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.kc[data-interactive='true']:hover .kc-face { background: linear-gradient(180deg, #4c4658, #3a3543); }
+
+/* Dipilih (Remap): tertekan + garis terang. Sengaja BUKAN tembaga —
+   tembaga hanya untuk rail aktif, aksi utama, dan tombol yang ditekan
+   di Tester. */
+.kc[data-selected='true'] { background: linear-gradient(180deg, var(--ink-3), var(--edge-bright)); }
+.kc[data-selected='true'] .kc-face {
+  background: linear-gradient(180deg, #575064, #423c4e);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.kc[data-selected='true'] .kc-legend { color: var(--ink); }
+
+/* Sudah pernah terlihat di Tester: tint tipis yang menetap. */
+.kc[data-seen='true'] .kc-face { background: linear-gradient(180deg, #3a4f49, #2c3d38); }
+.kc[data-seen='true'] .kc-legend { color: #a6d8cc; }
+
+/* Sedang ditekan di Tester: satu-satunya keycap yang boleh tembaga. */
+.kc[data-held='true'] { background: linear-gradient(180deg, var(--accent), var(--accent-dim)); }
+.kc[data-held='true'] .kc-face {
+  background: linear-gradient(180deg, var(--accent), #c67c40);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 1px rgba(0, 0, 0, 0.5);
+  transition: none; /* tekan seketika; lepas yang ber-easing 120ms */
+}
+.kc[data-held='true'] .kc-legend { color: #1a1206; }
+
+/* Terkunci (Fn di Remap): tetap tampil, ditandai, tidak bisa dipilih. */
+.kc[data-locked='true'] { opacity: 0.72; cursor: not-allowed; }
+.kc[data-locked='true'] .kc-face {
+  background: repeating-linear-gradient(
+    -45deg, #3a3644, #3a3644 3px, #302c39 3px, #302c39 6px);
+  box-shadow: inset 0 0 0 1px var(--edge-bright);
+}
+.kc[data-locked='true'] .kc-legend { color: var(--ink-3); }
+
+/* Satu pemuatan terorkestrasi: baris demi baris, jeda 28ms per baris. */
+@keyframes kc-row-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
+.kb-stage[data-reveal='on'] .kc {
+  animation: kc-row-in 260ms cubic-bezier(0.22, 0.7, 0.28, 1) both;
+  animation-delay: calc(var(--row, 0) * 28ms);
+}
+
+@keyframes panel-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.panel-swap { animation: panel-in 140ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-stage[data-reveal='on'] .kc { animation: none; }
+  .kc-face { transition: none; }
+  .panel-swap { animation: none; }
+  .switch-knob { transition: none; }
+}
+
+/* -------------------------------------------------------------- scrollbar */
+
+* { scrollbar-color: var(--edge-bright) transparent; scrollbar-width: thin; }

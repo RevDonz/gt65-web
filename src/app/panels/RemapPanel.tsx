@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { KeyboardGrid } from '../KeyboardGrid';
-import { MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS } from '../../gt65/keycodes';
+import { KeyboardGrid, BINDING_TAGS } from '../KeyboardGrid';
+import { KEYS } from '../../gt65/layout';
+import {
+  MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS, MODIFIERS,
+} from '../../gt65/keycodes';
 import type { Entry, Layer } from '../../gt65/protocol';
 import type { Profile } from '../../store/profile';
 
@@ -34,6 +37,38 @@ export function parseKeyChoice(raw: string): number | null {
   return Number.isInteger(usage) ? usage : null;
 }
 
+const MOD_NAMES: [number, string][] = [
+  [MODIFIERS.ctrl, 'Ctrl'], [MODIFIERS.shift, 'Shift'],
+  [MODIFIERS.alt, 'Alt'], [MODIFIERS.gui, 'Win'],
+];
+
+/**
+ * Ringkasan binding yang sedang berlaku, ditampilkan di kepala inspektur.
+ * Papan ini tidak bisa dibaca balik, jadi satu-satunya cara pengguna tahu
+ * apa yang akan tertulis adalah membacanya di sini sebelum menekan
+ * "Terapkan".
+ */
+export function describeEntry(entry: Entry | undefined): string {
+  if (!entry) return 'kosong';
+  switch (entry.kind) {
+    case 'none': return 'nonaktif';
+    case 'key': {
+      const label = HID_KEYS.find((k) => k.usage === entry.usage)?.label
+        ?? `usage 0x${entry.usage.toString(16)}`;
+      const mods = MOD_NAMES.filter(([bit]) => entry.mod & bit).map(([, n]) => n);
+      return [...mods, label].join(' + ');
+    }
+    case 'media':
+      return MEDIA_ACTIONS.find((a) => a.entry.kind === 'media'
+        && a.entry.usage === entry.usage)?.label ?? `multimedia 0x${entry.usage.toString(16)}`;
+    case 'mouse':
+      return MOUSE_ACTIONS.find((a) => a.entry.kind === 'mouse'
+        && a.entry.ev === entry.ev && a.entry.val === entry.val)?.label ?? 'mouse';
+    case 'macro':
+      return `makro slot ${entry.slot}`;
+  }
+}
+
 export function RemapPanel({ profile, onChange, onApply }: {
   profile: Profile;
   onChange: (p: Profile) => void;
@@ -42,6 +77,7 @@ export function RemapPanel({ profile, onChange, onApply }: {
   const [layer, setLayer] = useState<Layer>('top');
   const [selected, setSelected] = useState<number | null>(null);
   const entries = profile.layers[layer];
+  const key = selected === null ? undefined : KEYS.find((k) => k.keyIndex === selected);
 
   const assign = (e: Entry) => {
     if (selected === null) return;
@@ -51,63 +87,112 @@ export function RemapPanel({ profile, onChange, onApply }: {
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex gap-2">
-        {(['top', 'fn'] as Layer[]).map((l) => (
-          <button key={l} onClick={() => setLayer(l)}
-                  className={`rounded px-3 py-1 ${
-                    layer === l ? 'bg-slate-700' : 'hover:bg-slate-800'}`}>
-            {l === 'top' ? 'Layer utama' : 'Layer Fn'}
-          </button>
-        ))}
-        <button onClick={() => onApply(layer)}
-                className="ml-auto rounded bg-emerald-700 px-4 py-2 hover:bg-emerald-600">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex overflow-hidden rounded-[3px] border border-[var(--edge-bright)]">
+          {(['top', 'fn'] as Layer[]).map((l) => (
+            <button key={l} onClick={() => setLayer(l)}
+                    aria-pressed={layer === l}
+                    className="px-3 py-1.5 text-[12px] font-medium"
+                    style={layer === l
+                      ? { background: 'var(--panel-2)', color: 'var(--ink)' }
+                      : { background: 'transparent', color: 'var(--ink-3)' }}>
+              {l === 'top' ? 'Layer utama' : 'Layer Fn'}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-[var(--ink-3)]">
+          {selected === null
+            ? 'Klik satu tombol untuk mengubah fungsinya.'
+            : 'Pilih fungsi baru di kolom kanan.'}
+        </span>
+        <button className="btn btn-primary ml-auto" onClick={() => onApply(layer)}>
           Terapkan layer ini
         </button>
       </div>
 
-      <KeyboardGrid entries={entries} selected={selected} onSelect={setSelected} />
-
-      {selected === null ? (
-        <p className="text-slate-400">Klik satu tombol untuk mengubah fungsinya.</p>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-4">
-          <Group title="Tombol">
-            <select value={keySelectValue(entries[selected])}
-                    onChange={(e) => {
-                      const usage = parseKeyChoice(e.target.value);
-                      if (usage === null) return;
-                      assign({ kind: 'key', mod: 0, usage });
-                    }}
-                    className="w-full rounded bg-slate-800 px-2 py-1">
-              <option value="">— pilih —</option>
-              {HID_KEY_GROUPS.map((g) => (
-                <optgroup key={g.id} label={g.label}>
-                  {g.keys.map((k) => (
-                    <option key={k.usage} value={k.usage}>{k.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </Group>
-          <Group title="Shortcut">
-            {SHORTCUTS.map((a) => (
-              <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
+      {/*
+        Papan tetap terlihat sewaktu memilih fungsi: pemilih duduk sebagai
+        kolom kanan, bukan di bawah papan. Di viewport sempit ia jatuh ke
+        bawah papan seperti biasa.
+      */}
+      <div className={`grid gap-4 ${
+        selected === null ? '' : 'lg:grid-cols-[minmax(0,1fr)_330px]'}`}>
+        <div className="flex flex-col gap-3">
+          <KeyboardGrid entries={entries} selected={selected} onSelect={setSelected} />
+          <div className="flex flex-wrap items-center gap-4">
+            {BINDING_TAGS.map((t) => (
+              <span key={t.kind} className="flex items-center gap-1.5 text-[10px]
+                                            text-[var(--ink-3)]">
+                <span className="h-[5px] w-[5px] rounded-full"
+                      style={{ background: t.color }} />
+                {t.label}
+              </span>
             ))}
-          </Group>
-          <Group title="Multimedia">
-            {MEDIA_ACTIONS.map((a) => (
-              <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
-            ))}
-          </Group>
-          <Group title="Mouse">
-            {MOUSE_ACTIONS.map((a) => (
-              <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
-            ))}
-            <Btn onClick={() => assign({ kind: 'none' })}>Nonaktifkan</Btn>
-          </Group>
+            <span className="text-[10px] text-[var(--ink-3)]">
+              tanpa titik · tombol biasa
+            </span>
+          </div>
         </div>
-      )}
+
+        {selected !== null && (
+          <aside className="panel flex max-h-[70vh] flex-col overflow-y-auto">
+            <div className="sticky top-0 flex items-baseline gap-2 border-b
+                            border-[var(--edge)] bg-[var(--panel)] px-3 py-2.5">
+              <span className="text-[13px] font-semibold">{key?.name ?? '?'}</span>
+              <span className="num text-[10px] text-[var(--ink-3)]">
+                idx {selected}
+              </span>
+              <button className="btn btn-quiet ml-auto px-2 py-0.5 text-[11px]"
+                      onClick={() => setSelected(null)}>Tutup</button>
+            </div>
+            <div className="px-3 py-2 text-[11px] text-[var(--ink-2)]">
+              Sekarang: <span style={{ color: 'var(--ink)' }}>
+                {describeEntry(entries[selected])}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-4 px-3 pb-4">
+              <Group title="Tombol">
+                <select value={keySelectValue(entries[selected])}
+                        onChange={(e) => {
+                          const usage = parseKeyChoice(e.target.value);
+                          if (usage === null) return;
+                          assign({ kind: 'key', mod: 0, usage });
+                        }}
+                        className="field w-full">
+                  <option value="">— pilih —</option>
+                  {HID_KEY_GROUPS.map((g) => (
+                    <optgroup key={g.id} label={g.label}>
+                      {g.keys.map((k) => (
+                        <option key={k.usage} value={k.usage}>{k.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </Group>
+              <Group title="Shortcut">
+                {SHORTCUTS.map((a) => (
+                  <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
+                ))}
+              </Group>
+              <Group title="Multimedia">
+                {MEDIA_ACTIONS.map((a) => (
+                  <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
+                ))}
+              </Group>
+              <Group title="Mouse">
+                {MOUSE_ACTIONS.map((a) => (
+                  <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
+                ))}
+              </Group>
+              <Group title="Lainnya">
+                <Btn onClick={() => assign({ kind: 'none' })}>Nonaktifkan</Btn>
+              </Group>
+            </div>
+          </aside>
+        )}
+      </div>
     </section>
   );
 }
@@ -115,7 +200,7 @@ export function RemapPanel({ profile, onChange, onApply }: {
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-xs uppercase tracking-wide text-slate-400">{title}</h3>
+      <h3 className="label">{title}</h3>
       {children}
     </div>
   );
@@ -124,7 +209,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 function Btn({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
     <button onClick={onClick}
-            className="rounded bg-slate-800 px-2 py-1 text-left hover:bg-slate-700">
+            className="btn justify-start text-left font-normal">
       {children}
     </button>
   );

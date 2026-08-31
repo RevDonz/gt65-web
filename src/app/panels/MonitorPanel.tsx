@@ -31,19 +31,25 @@ export function MonitorPanel({ device }: { device: HIDDevice | null }) {
   }, [device]);
 
   if (!device) {
-    return <p className="text-slate-400">Sambungkan keyboard untuk memantau.</p>;
+    return (
+      <p className="panel px-4 py-3 text-[12px] text-[var(--ink-2)]">
+        Sambungkan keyboard untuk memantau.
+      </p>
+    );
   }
 
   return (
     <section>
       <div className="mb-3 flex items-center gap-3">
+        <span className="label">Monitor laporan vendor</span>
         <button onClick={() => setLines([])}
-                className="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800">
+                className="btn">
           Bersihkan
         </button>
-        <span className="text-slate-400">{lines.length} event</span>
+        <span className="num text-[11px] text-[var(--ink-3)]">{lines.length} event</span>
       </div>
-      <ul className="max-h-96 overflow-y-auto rounded bg-slate-950 p-3 font-mono text-xs">
+      <ul className="well num max-h-96 overflow-y-auto p-3 text-[10px] leading-[1.7]
+                     text-[var(--ink-2)]">
         {lines.map((l, i) => (
           <li key={i}>
             {l.at} · indeks {l.index ?? '(di luar laporan)'} · {l.hex}

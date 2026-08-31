@@ -1,25 +1,31 @@
 import { useState } from 'react';
 
+/**
+ * Dua langkah, bukan satu: pemulihan bawaan menulis ulang SELURUH
+ * konfigurasi (dua layer remap, pencahayaan, pengaturan) ke perangkat yang
+ * tidak bisa dibaca balik, jadi salah klik tidak bisa diperiksa apalagi
+ * dibatalkan.
+ */
 export function RestoreButton({ onRestore }: { onRestore: () => void }) {
   const [confirming, setConfirming] = useState(false);
 
   if (!confirming) {
     return (
-      <button onClick={() => setConfirming(true)}
-              className="rounded border border-amber-600 px-3 py-1 text-amber-400
-                         hover:bg-amber-950">
+      <button className="btn" onClick={() => setConfirming(true)}
+              style={{ color: 'var(--warn)', borderColor: 'var(--edge-bright)' }}>
         Pulihkan bawaan
       </button>
     );
   }
 
   return (
-    <span className="flex items-center gap-2 text-sm">
+    <span className="flex items-center gap-2 text-[11px] text-[var(--ink-2)]">
       Tulis ulang seluruh konfigurasi ke bawaan?
-      <button onClick={() => { setConfirming(false); onRestore(); }}
-              className="rounded bg-amber-700 px-3 py-1">Ya, tulis</button>
-      <button onClick={() => setConfirming(false)}
-              className="rounded border border-slate-600 px-3 py-1">Batal</button>
+      <button className="btn" onClick={() => { setConfirming(false); onRestore(); }}
+              style={{ color: 'var(--warn)', borderColor: 'var(--warn)' }}>
+        Ya, tulis
+      </button>
+      <button className="btn btn-quiet" onClick={() => setConfirming(false)}>Batal</button>
     </span>
   );
 }

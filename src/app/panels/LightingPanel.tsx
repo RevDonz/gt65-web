@@ -59,16 +59,17 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
     v.toString(16).padStart(2, '0')).join('')}`;
 
   return (
-    <section className="flex max-w-md flex-col gap-4">
+    <section className="panel flex max-w-xl flex-col gap-4 p-4">
+      <div className="label">Pencahayaan</div>
       <label className="flex items-center justify-between gap-4">
-        Mode
+        <span className="label">Mode</span>
         <select value={String(l.mode)}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   if (!Number.isInteger(v)) return;
                   set({ mode: v });
                 }}
-                className="w-56 rounded bg-slate-800 px-2 py-1">
+                className="field w-56">
           {LIGHT_MODES
             .map((name, i) => ({ name, i }))
             .filter(({ i }) => i >= LIGHT_MODE_MIN && i <= LIGHT_MODE_MAX)
@@ -77,8 +78,7 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
             ))}
         </select>
       </label>
-      <p className="-mt-2 rounded border border-slate-700 bg-slate-800/40 p-2
-                    text-xs text-slate-300">
+      <p className="-mt-2 well p-2.5 text-[11px] leading-relaxed text-[var(--ink-2)]">
         Warna RGB di bawah <strong>tidak berlaku untuk semua mode</strong> —
         belum diketahui pasti mode mana yang memakainya. Saat warna diset ke
         kuning, efeknya tidak terlihat di sebagian mode (kemungkinan mode
@@ -88,18 +88,22 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
       </p>
 
       <label className="flex items-center justify-between gap-4">
-        Warna
-        <input type="color" value={hex}
-               onChange={(e) => {
-                 const v = e.target.value;
-                 set({ r: parseInt(v.slice(1, 3), 16),
-                       g: parseInt(v.slice(3, 5), 16),
-                       b: parseInt(v.slice(5, 7), 16) });
-               }} />
+        <span className="label">Warna</span>
+        <span className="flex items-center gap-2">
+          <span className="num text-[11px] uppercase text-[var(--ink-3)]">{hex}</span>
+          <input type="color" value={hex}
+                 className="h-7 w-14 cursor-pointer rounded-[3px]
+                            border border-[var(--edge-bright)] bg-[var(--panel-2)] p-[3px]"
+                 onChange={(e) => {
+                   const v = e.target.value;
+                   set({ r: parseInt(v.slice(1, 3), 16),
+                         g: parseInt(v.slice(3, 5), 16),
+                         b: parseInt(v.slice(5, 7), 16) });
+                 }} />
+        </span>
       </label>
 
-      <p className="-mt-2 rounded border border-slate-700 bg-slate-800/40 p-2
-                    text-xs text-slate-300">
+      <p className="-mt-2 well p-2.5 text-[11px] leading-relaxed text-[var(--ink-2)]">
         Kecepatan dan kecerahan dibatasi 0-4 (byte kabel 1-5). Batas atas ini
         berasal dari <code>rgb-keyboard.xml</code> vendor (<code>speed_max=5</code>,
         <code>brightness_max=5</code>) — ini batas yang didokumentasikan
@@ -110,28 +114,28 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
       </p>
 
       <label className="flex items-center justify-between gap-4">
-        Kecepatan (payload[10])
+        <span className="label">Kecepatan (payload[10])</span>
         <input type="number" min={0} max={4} value={l.speed}
                onChange={(e) => set({ speed: Number(e.target.value) })}
-               className="w-24 rounded bg-slate-800 px-2 py-1" />
+               className="field num w-24" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
-        Kecerahan (payload[9])
+        <span className="label">Kecerahan (payload[9])</span>
         <input type="number" min={0} max={4} value={l.brightness}
                onChange={(e) => set({ brightness: Number(e.target.value) })}
-               className="w-24 rounded bg-slate-800 px-2 py-1" />
+               className="field num w-24" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
-        Arah
+        <span className="label">Arah</span>
         <select value={String(l.direction)}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   if (!Number.isInteger(v)) return;
                   set({ direction: v });
                 }}
-                className="w-40 rounded bg-slate-800 px-2 py-1">
+                className="field w-40">
           {DIRECTION_OPTIONS.map(({ value, label }) => (
             <option key={value} value={value}>{label}</option>
           ))}
@@ -139,17 +143,16 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
       </label>
 
       <button onClick={onApply}
-              className="rounded bg-emerald-700 px-4 py-2 hover:bg-emerald-600">
+              className="btn btn-primary">
         Terapkan pencahayaan
       </button>
 
-      <div className="flex flex-col gap-1 border-t border-slate-700 pt-4">
+      <div className="flex flex-col gap-1 border-t border-[var(--edge)] pt-4">
         <button onClick={onApplyVendorReference}
-                className="rounded border border-sky-700 bg-sky-950/40 px-4 py-2
-                           text-sky-200 hover:bg-sky-900/40">
+                className="btn justify-center py-2">
           Kirim nilai vendor (referensi)
         </button>
-        <p className="text-xs text-slate-400">
+        <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
           Mengirim persis paket yang terbaca dari buffer perangkat sungguhan
           setelah software vendor asli menyalakannya: mode 0x0b, merah penuh,
           kecerahan hampir penuh (nilai UI 15) dan kecepatan sedang (nilai UI

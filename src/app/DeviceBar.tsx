@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Status } from './useDevice';
 
 const LABEL: Record<Status, string> = {
@@ -7,26 +8,72 @@ const LABEL: Record<Status, string> = {
   error: 'Gagal',
 };
 
-export function DeviceBar({ status, error, dryRun, onConnect, onToggleDryRun }: {
-  status: Status; error: string | null; dryRun: boolean;
-  onConnect: () => void; onToggleDryRun: (v: boolean) => void;
+/**
+ * Bilah tipis: nama produk, status perangkat sebagai pil ber-titik, aksi
+ * profil, lalu sakelar mode kering di paling kanan.
+ *
+ * Sakelar itu dibuat sebagai sakelar sungguhan dengan label keadaan yang
+ * tertulis penuh, bukan checkbox kecil. Mode kering adalah pengaman utama
+ * aplikasi ini dan bawaannya kembali menyala setiap halaman dimuat ulang;
+ * dua kali pengguna terjebak karena perubahan keadaan itu tidak terlihat.
+ * Pasangannya adalah strip di atas area isi (lihat App.tsx) yang menyatakan
+ * akibatnya dengan kalimat, bukan hanya warna.
+ */
+export function DeviceBar({
+  status, error, dryRun, productName, onConnect, onToggleDryRun, actions,
+}: {
+  status: Status;
+  error: string | null;
+  dryRun: boolean;
+  productName: string | null;
+  onConnect: () => void;
+  onToggleDryRun: (v: boolean) => void;
+  actions?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-center gap-4 border-b border-slate-700 px-6 py-3">
-      <span className="font-semibold">GT65</span>
-      <button onClick={onConnect}
-              className="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800">
-        Sambungkan keyboard
-      </button>
-      <span className={status === 'connected' ? 'text-emerald-400' : 'text-slate-400'}>
-        {LABEL[status]}
-      </span>
-      <label className="ml-auto flex items-center gap-2">
-        <input type="checkbox" checked={dryRun}
-               onChange={(e) => onToggleDryRun(e.target.checked)} />
-        Mode kering (tidak menulis ke keyboard)
-      </label>
-      {error && <p className="w-full text-sm text-rose-400">{error}</p>}
+    <header className="border-b border-[var(--edge)] bg-[var(--panel)]">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2">
+        <div className="flex items-baseline gap-2 pr-1">
+          <span className="text-[15px] font-bold tracking-[0.06em]">GT65</span>
+          <span className="label">Konfigurator</span>
+        </div>
+
+        <span className="h-5 w-px bg-[var(--edge)]" />
+
+        <span className="pill" title={LABEL[status]}>
+          <span className="dot" data-state={status} />
+          <span>{LABEL[status]}</span>
+          {status === 'connected' && productName && (
+            <span className="num text-[var(--ink-3)]">{productName}</span>
+          )}
+        </span>
+
+        <button className="btn" onClick={onConnect}>Sambungkan</button>
+
+        <span className="h-5 w-px bg-[var(--edge)]" />
+
+        {actions}
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="label">Mode kering</span>
+          <button type="button" role="switch" aria-checked={dryRun}
+                  className="switch" data-on={dryRun}
+                  onClick={() => onToggleDryRun(!dryRun)}>
+            <span className="switch-track"><span className="switch-knob" /></span>
+            <span className="text-[11px] font-semibold tracking-[0.08em]"
+                  style={{ color: dryRun ? 'var(--accent)' : 'var(--crit)' }}>
+              {dryRun ? 'AKTIF' : 'MATI'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <p className="border-t border-[var(--edge)] px-4 py-1.5 text-[11px]"
+           style={{ color: 'var(--crit)' }}>
+          {error}
+        </p>
+      )}
     </header>
   );
 }
