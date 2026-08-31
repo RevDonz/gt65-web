@@ -106,6 +106,79 @@ describe('tab Tester', () => {
   });
 });
 
+/**
+ * Bug asli (2026-08-31): pengguna memetakan ulang "del" fisik (keyIndex 119,
+ * usage pabrik 0x4C) ke Home (0x4A). Keyboard sungguhan mengirim 0x4A saat
+ * tombol itu ditekan, tapi Tester dulu mencocokkan usage yang masuk hanya
+ * terhadap `layout.ts` pabrik — yang tidak punya 0x4A sama sekali di papan
+ * 65% ini — sehingga tombol yang benar-benar ada di layar dinyatakan "di
+ * luar papan ini". Tes di bawah menutup jalur itu dari ujung ke ujung: lewat
+ * Remap sungguhan, lalu Tester sungguhan, bukan cuma fungsi resolver murni
+ * (sudah diuji terpisah di testerResolve.test.ts).
+ */
+describe('tab Tester: usage dicocokkan ke profil aktif', () => {
+  const findKey = (el: Element, name: string) =>
+    [...el.querySelectorAll('.kc')].find(
+      (b) => (b as HTMLElement).title.split(' ')[0] === name) as HTMLButtonElement;
+
+  const remap = async (el: Element, physicalName: string, targetUsage: number) => {
+    const key = findKey(el, physicalName);
+    await act(async () => { key.click(); });
+    const select = el.querySelector('aside select') as HTMLSelectElement;
+    await act(async () => {
+      select.value = String(targetUsage);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+
+  test('del dipetakan ke Home: kepala tombol di Tester terbaca "Home", legenda asli "del" tetap terlihat', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await remap(el, 'del', 0x4a);
+
+    await clickTab('Tester');
+    const key = findKey(el, 'del'); // title tetap nama fisik "del"
+    expect(key.querySelector('.kc-legend')!.textContent).toBe('Home');
+    expect(key.querySelector('.kc-legend-orig')!.textContent).toBe('del');
+    await cleanup();
+  });
+
+  test('menekan tombol yang mengirim usage Home menyalakan keycap "del" dan menyebutnya di "Event terakhir"', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    await remap(el, 'del', 0x4a);
+
+    await clickTab('Tester');
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Home', cancelable: true }));
+    });
+    expect(findKey(el, 'del').dataset.held).toBe('true');
+    expect(el.textContent).toContain('tombol "del" (indeks 119)');
+    expect(el.textContent).not.toContain('di luar papan ini');
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Home', cancelable: true }));
+    });
+    expect(findKey(el, 'del').dataset.seen).toBe('true');
+    await cleanup();
+  });
+
+  test('dua tombol fisik dipetakan ke usage yang sama: keduanya menyala, readout mengaku ambigu', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    await clickTab('Remap');
+    const aUsage = KEYS.find((k) => k.name === 'A')!.usage;
+    await remap(el, 'del', aUsage); // "del" sekarang juga mengirim usage "A"
+
+    await clickTab('Tester');
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', cancelable: true }));
+    });
+    expect(el.querySelectorAll('.kc[data-held="true"]').length).toBe(2);
+    expect(el.textContent).toContain('2 tombol memetakan usage ini');
+    await cleanup();
+  });
+});
+
 describe('tab Remap', () => {
   test('Fn tetap tergambar tapi terkunci, dan memilih tombol membuka inspektur', async () => {
     const { el, clickTab, cleanup } = await mountApp();

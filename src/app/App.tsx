@@ -282,7 +282,7 @@ export function App() {
                                  }),
                                )} />
               )}
-              {tab === 'Tester' && <TesterPanel />}
+              {tab === 'Tester' && <TesterPanel profile={profile} />}
               {tab === 'Pengaturan' && (
                 <SettingsPanel profile={profile} onChange={setProfile}
                                onApply={() => dev.send('Terapkan pengaturan', settings(profile.settings))} />
