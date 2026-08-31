@@ -1,3 +1,10 @@
+/** Hex satu baris, byte dipisah spasi — dipakai untuk balikan echo dan
+ * paket tunggal di tampilan kompak, beda dengan dump multi-baris
+ * {@link formatHex}. */
+export function hexLine(bytes: Uint8Array): string {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(' ');
+}
+
 export function formatHex(packets: Uint8Array[]): string {
   return packets
     .map((p, i) => {

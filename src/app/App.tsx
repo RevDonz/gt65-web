@@ -7,13 +7,14 @@ import { LightingPanel } from './panels/LightingPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { MonitorPanel } from './panels/MonitorPanel';
 import { RemapPanel } from './panels/RemapPanel';
+import { LogPanel } from './panels/LogPanel';
 import { lighting, settings, remap } from '../gt65/protocol';
 import {
   defaultProfile, exportProfile, importProfile, loadProfile, saveProfile,
 } from '../store/profile';
 import type { Profile } from '../store/profile';
 
-const TABS = ['Remap', 'Lampu', 'Pengaturan', 'Monitor'] as const;
+const TABS = ['Remap', 'Lampu', 'Pengaturan', 'Monitor', 'Log'] as const;
 type Tab = (typeof TABS)[number];
 
 /** Nama berkas unduhan dari nama profil; jatuh ke default kalau kosong/aneh. */
@@ -85,6 +86,7 @@ export function App() {
           // dan berurutan, tapi pratinjau mode kering memperlihatkan
           // keempatnya sekaligus.
           await dev.send(
+            'Pulihkan bawaan',
             remap('top', d.layers.top),
             remap('fn', d.layers.fn),
             lighting(d.lighting),
@@ -117,17 +119,24 @@ export function App() {
       <main className="px-6 pb-10">
         {tab === 'Remap' && (
           <RemapPanel profile={profile} onChange={setProfile}
-                      onApply={(l) => dev.send(remap(l, profile.layers[l]))} />
+                      onApply={(l) => dev.send(
+                        l === 'top' ? 'Terapkan layer utama' : 'Terapkan layer Fn',
+                        remap(l, profile.layers[l]),
+                      )} />
         )}
         {tab === 'Lampu' && (
           <LightingPanel profile={profile} onChange={setProfile}
-                         onApply={() => dev.send(lighting(profile.lighting))} />
+                         onApply={() => dev.send('Terapkan pencahayaan', lighting(profile.lighting))} />
         )}
         {tab === 'Pengaturan' && (
           <SettingsPanel profile={profile} onChange={setProfile}
-                         onApply={() => dev.send(settings(profile.settings))} />
+                         onApply={() => dev.send('Terapkan pengaturan', settings(profile.settings))} />
         )}
         {tab === 'Monitor' && <MonitorPanel device={dev.device} />}
+        {tab === 'Log' && (
+          <LogPanel entries={dev.log} dryRun={dryRun}
+                    productName={dev.device?.productName ?? null} />
+        )}
         {dev.lastPackets.length > 0 && (
           <pre className="mt-6 overflow-x-auto rounded bg-slate-950 p-4 text-xs">
             {formatHex(dev.lastPackets)}

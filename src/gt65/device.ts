@@ -101,6 +101,18 @@ export async function sendTransaction(
   }
 }
 
+/**
+ * Membaca balik feature report 0. Ditemukan di hardware bahwa buffer ini
+ * adalah **echo dari feature report terakhir yang ditulis** ke perangkat —
+ * bukan konfigurasi tersimpan. Lemah sebagai API baca-konfigurasi, tapi
+ * berguna sebagai diagnostik: kalau isinya cocok dengan paket terakhir
+ * yang dikirim, byte itu terbukti sampai ke perangkat.
+ */
+export async function receiveFeatureEcho(dev: HIDDevice): Promise<Uint8Array> {
+  const v = await dev.receiveFeatureReport(FEATURE_REPORT_ID);
+  return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+}
+
 /** Berlangganan Report ID 5 dari interface vendor. Mengembalikan fungsi berhenti. */
 export function onVendorInput(
   dev: HIDDevice,

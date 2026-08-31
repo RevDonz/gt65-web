@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { findConfigInterface, sendTransaction, DeviceError, onVendorInput,
-         VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
+         receiveFeatureEcho, VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
 
 const withFeature = {
   productName: 'USB DEVICE',
@@ -57,6 +57,26 @@ describe('pengiriman transaksi', () => {
     const dev = { opened: true, sendFeatureReport: vi.fn() } as unknown as HIDDevice;
     await expect(sendTransaction(dev, [new Uint8Array(65)], 0))
       .rejects.toThrow(/64 byte/);
+  });
+});
+
+describe('echo feature report', () => {
+  test('meneruskan hanya byte milik DataView, bukan seluruh ArrayBuffer', async () => {
+    // ArrayBuffer besar dengan padding di depan dan belakang bagian yang
+    // sebenarnya jadi DataView — persis pola bug offset/byteLength yang
+    // sudah dua kali ditemukan di codebase ini (lihat onVendorInput).
+    const buf = new ArrayBuffer(70);
+    new Uint8Array(buf).set([9, 9, 9, 9, ...Array(64).fill(0).map((_, i) => i)]);
+    const view = new DataView(buf, 4, 64);
+    const receiveFeatureReport = vi.fn().mockResolvedValue(view);
+    const dev = { receiveFeatureReport } as unknown as HIDDevice;
+
+    const echo = await receiveFeatureEcho(dev);
+
+    expect(receiveFeatureReport).toHaveBeenCalledWith(0);
+    expect(echo.length).toBe(64);
+    expect(echo[0]).toBe(0);
+    expect(echo[63]).toBe(63);
   });
 });
 
