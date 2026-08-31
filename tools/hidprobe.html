@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>GT65 hardware probe</title>
+<button id="go">Sambungkan dan uji</button>
+<pre id="out"></pre>
+<script>
+const out = document.getElementById('out');
+const L = s => out.textContent += s + '\n';
+
+document.getElementById('go').onclick = async () => {
+  out.textContent = '';
+  const devices = await navigator.hid.requestDevice({
+    filters: [{ vendorId: 0x05ac, productId: 0x024f }]
+  });
+  for (const d of devices) {
+    const feature = d.collections.flatMap(c => c.featureReports ?? []);
+    L(`${d.productName}: ${d.collections.length} collection, ${feature.length} feature report`);
+    if (!feature.length) continue;
+
+    try {
+      await d.open();
+      L('  open(): BERHASIL');
+    } catch (e) {
+      L(`  open(): GAGAL — ${e.name}: ${e.message}`);
+      L('  -> pasang udev rule, lihat langkah berikutnya');
+      continue;
+    }
+
+    try {
+      const view = await d.receiveFeatureReport(0);
+      const hex = [...new Uint8Array(view.buffer)]
+        .map(b => b.toString(16).padStart(2, '0')).join(' ');
+      L('  receiveFeatureReport(0): BERHASIL — perangkat BISA dibaca');
+      L('  ' + hex);
+    } catch (e) {
+      L(`  receiveFeatureReport(0): GAGAL — ${e.name}`);
+      L('  -> perangkat write-only, sesuai asumsi spec');
+    }
+    await d.close();
+  }
+};
+</script>
