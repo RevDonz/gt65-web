@@ -97,3 +97,52 @@ export function settings(c: Settings): Uint8Array[] {
     cmd(0x02),
   ];
 }
+
+export type Entry =
+  | { kind: 'none' }
+  | { kind: 'key'; mod: number; usage: number }
+  | { kind: 'media'; usage: number }
+  | { kind: 'mouse'; ev: 1 | 3; val: number }
+  | { kind: 'macro'; slot: number; mode: number; repeat: number };
+
+export type Layer = 'top' | 'fn';
+
+export const TABLE_ENTRIES = 144;
+export const TABLE_BYTES = TABLE_ENTRIES * 4;
+
+/** entry[0] tag tipe, entry[1] modifier, entry[2] usage/nilai, entry[3] tambahan. */
+export function encodeEntry(e: Entry): [number, number, number, number] {
+  switch (e.kind) {
+    case 'none':  return [0x00, 0, 0, 0];
+    case 'mouse': return [0x01, e.ev, e.val & 0xff, 0];
+    case 'key':   return [0x02, e.mod & 0xff, e.usage & 0xff, 0];
+    case 'media': return [0x03, e.usage & 0xff, 0, 0];
+    case 'macro': return [0x06, e.slot & 0xff, e.mode & 0xff, e.repeat & 0xff];
+  }
+}
+
+/**
+ * 144 entri x 4 byte. Indeks tabel adalah `key_index` dari
+ * KeyboardLayout.xml (tertinggi 121), sehingga slot sisanya tetap nol.
+ * Dua byte terakhir dipakai penanda AA 55, menimpa sebagian slot 143
+ * yang memang tak terpakai — sama seperti software vendor.
+ */
+export function buildTable(entries: Entry[]): Uint8Array {
+  const t = new Uint8Array(TABLE_BYTES);
+  for (let i = 0; i < Math.min(entries.length, TABLE_ENTRIES); i++) {
+    t.set(encodeEntry(entries[i]), i * 4);
+  }
+  t[TABLE_BYTES - 2] = 0xaa;
+  t[TABLE_BYTES - 1] = 0x55;
+  return t;
+}
+
+export function remap(layer: Layer, entries: Entry[]): Uint8Array[] {
+  return [
+    cmd(0x18),
+    cmd(layer === 'fn' ? 0x27 : 0x11, { 8: 9 }),
+    ...chunks(buildTable(entries)),
+    cmd(0x02),
+    cmd(0xf0),
+  ];
+}
