@@ -37,24 +37,156 @@ export function defaultProfile(): Profile {
   };
 }
 
+// --- Validasi -------------------------------------------------------------
+//
+// Keyboard ini tidak bisa dibaca balik, jadi profil yang bentuknya salah
+// tidak menimbulkan error apa pun — ia hanya menulis byte yang salah ke
+// perangkat, atau membuat panel UI crash saat render (tanpa error boundary,
+// crash render mengosongkan halaman dan satu-satunya jalan keluar adalah
+// menghapus data situs). Karena itu profil dari sumber luar — berkas impor
+// maupun localStorage yang bisa diedit tangan — harus lolos pemeriksaan
+// bentuk lengkap sebelum dipakai.
+
+function fail(msg: string): never {
+  throw new Error(msg);
+}
+
+/** Semua angka di protokol ini muat dalam satu byte payload. */
+function byte(v: unknown, what: string): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 255) {
+    fail(`Profil rusak: ${what} harus bilangan bulat 0-255.`);
+  }
+  return v;
+}
+
+function parseEntry(v: unknown, where: string): Entry {
+  if (typeof v !== 'object' || v === null) {
+    fail(`Profil rusak: entri ${where} bukan objek.`);
+  }
+  const e = v as Record<string, unknown>;
+  switch (e.kind) {
+    case 'none':
+      return { kind: 'none' };
+    case 'key':
+      return { kind: 'key',
+               mod: byte(e.mod, `modifier entri ${where}`),
+               usage: byte(e.usage, `usage entri ${where}`) };
+    case 'media':
+      return { kind: 'media', usage: byte(e.usage, `usage media entri ${where}`) };
+    case 'mouse':
+      if (e.ev !== 1 && e.ev !== 3) {
+        fail(`Profil rusak: jenis kejadian mouse entri ${where} harus 1 atau 3.`);
+      }
+      return { kind: 'mouse', ev: e.ev, val: byte(e.val, `nilai mouse entri ${where}`) };
+    case 'macro':
+      return { kind: 'macro',
+               slot: byte(e.slot, `slot makro entri ${where}`),
+               mode: byte(e.mode, `mode makro entri ${where}`),
+               repeat: byte(e.repeat, `pengulangan makro entri ${where}`) };
+    default:
+      fail(`Profil rusak: jenis entri "${String(e.kind)}" tidak dikenal (${where}).`);
+  }
+}
+
+function parseLayer(v: unknown, name: string): Entry[] {
+  if (!Array.isArray(v) || v.length !== TABLE_ENTRIES) {
+    fail(`Profil rusak: layer ${name} harus berisi tepat ${TABLE_ENTRIES} entri.`);
+  }
+  return v.map((e, i) => parseEntry(e, `${name}[${i}]`));
+}
+
+function parseLighting(v: unknown): Lighting {
+  if (typeof v !== 'object' || v === null) {
+    fail('Profil rusak: blok pencahayaan tidak ada.');
+  }
+  const l = v as Record<string, unknown>;
+  return {
+    mode: byte(l.mode, 'mode lampu'),
+    r: byte(l.r, 'komponen merah'),
+    g: byte(l.g, 'komponen hijau'),
+    b: byte(l.b, 'komponen biru'),
+    speed: byte(l.speed, 'kecepatan lampu'),
+    brightness: byte(l.brightness, 'kecerahan lampu'),
+    direction: byte(l.direction, 'arah lampu'),
+  };
+}
+
+function parseSettings(v: unknown): Settings {
+  if (typeof v !== 'object' || v === null) {
+    fail('Profil rusak: blok pengaturan tidak ada.');
+  }
+  const s = v as Record<string, unknown>;
+  const flags = s.flags;
+  if (!Array.isArray(flags) || flags.length !== 5 ||
+      !flags.every((f) => typeof f === 'boolean')) {
+    fail('Profil rusak: pengaturan harus punya tepat 5 flag boolean.');
+  }
+  const out: Settings = {
+    flags: [flags[0], flags[1], flags[2], flags[3], flags[4]],
+    sleepTimeout: byte(s.sleepTimeout, 'timeout lampu tidur'),
+  };
+  if (s.profileIndex !== undefined) {
+    out.profileIndex = byte(s.profileIndex, 'indeks profil');
+  }
+  return out;
+}
+
+/**
+ * Satu-satunya gerbang masuk profil dari luar memori. Melempar `Error`
+ * berbahasa Indonesia (UI menampilkannya apa adanya) dan mengembalikan
+ * objek baru yang sudah dinormalkan — bukan referensi ke masukan — agar
+ * field asing tidak ikut terbawa ke penyimpanan atau ke perangkat.
+ */
+export function parseProfile(v: unknown): Profile {
+  if (typeof v !== 'object' || v === null) {
+    fail('Profil rusak: isinya bukan objek JSON.');
+  }
+  const p = v as Record<string, unknown>;
+  if (p.version !== VERSION) {
+    fail(`Versi profil ${String(p.version)} tidak dikenal, harus ${VERSION}.`);
+  }
+  if (typeof p.name !== 'string') {
+    fail('Profil rusak: nama profil bukan teks.');
+  }
+  if (typeof p.layers !== 'object' || p.layers === null) {
+    fail('Profil rusak: blok layer tidak ada.');
+  }
+  const layers = p.layers as Record<string, unknown>;
+  return {
+    version: VERSION,
+    name: p.name,
+    layers: {
+      top: parseLayer(layers.top, 'utama'),
+      fn: parseLayer(layers.fn, 'Fn'),
+    },
+    lighting: parseLighting(p.lighting),
+    settings: parseSettings(p.settings),
+  };
+}
+
+// --- Penyimpanan ----------------------------------------------------------
+
 export function loadProfile(): Profile {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultProfile();
-    const p = JSON.parse(raw) as Profile;
-    if (p.version !== VERSION) return defaultProfile();
-    if (p.layers?.top?.length !== TABLE_ENTRIES) return defaultProfile();
-    return p;
+    return parseProfile(JSON.parse(raw));
   } catch {
     return defaultProfile();
   }
 }
 
-export function saveProfile(p: Profile): void {
+/**
+ * localStorage masih salinan utama profil, jadi kegagalan menyimpan
+ * (kuota penuh, penyimpanan diblokir) berarti suntingan pengguna bisa
+ * hilang. Kembalikan hasilnya supaya UI bisa memberitahu.
+ */
+export function saveProfile(p: Profile): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+    return true;
   } catch {
-    // penyimpanan penuh atau diblokir; abaikan, profil tetap hidup di memori
+    return false;
   }
 }
 
@@ -63,12 +195,11 @@ export function exportProfile(p: Profile): string {
 }
 
 export function importProfile(json: string): Profile {
-  const p = JSON.parse(json) as Profile;
-  if (p.version !== VERSION) {
-    throw new Error(`Versi profil ${p.version} tidak dikenal, harus ${VERSION}.`);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    fail('Berkas ini bukan JSON yang sah.');
   }
-  if (p.layers?.top?.length !== TABLE_ENTRIES) {
-    throw new Error('Profil rusak: jumlah entri layer tidak sesuai.');
-  }
-  return p;
+  return parseProfile(raw);
 }
