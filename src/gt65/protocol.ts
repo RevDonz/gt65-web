@@ -47,3 +47,53 @@ export function chunks(buf: Uint8Array): Uint8Array[] {
   }
   return out;
 }
+
+export type Lighting = {
+  mode: number;
+  r: number; g: number; b: number;
+  speed: number;       // basis nol di UI
+  brightness: number;  // basis nol di UI
+  direction: number;
+};
+
+/**
+ * Byte 9 dan 10 dikirim berbasis satu; software vendor menaikkan
+ * keduanya dengan `inc al` sebelum menyimpan ke paket.
+ */
+export function lighting(c: Lighting): Uint8Array[] {
+  return [
+    cmd(0x18),
+    cmd(0x13, { 8: 1 }),
+    data({
+      0: c.mode,
+      1: c.r, 2: c.g, 3: c.b,
+      9: c.speed + 1,
+      10: c.brightness + 1,
+      11: c.direction,
+    }, 14),
+    cmd(0x02),
+    cmd(0xf0),
+  ];
+}
+
+export type Settings = {
+  /**
+   * Lima boolean di payload[1..5]. Pemetaan indeks ke makna belum
+   * ditentukan — lihat spec Bagian 5.4. Sampai selesai, UI tidak boleh
+   * memberi label pasti pada tiap flag.
+   */
+  flags: [boolean, boolean, boolean, boolean, boolean];
+  sleepTimeout: number;
+  profileIndex?: number;
+};
+
+export function settings(c: Settings): Uint8Array[] {
+  const f: Fields = { 6: c.sleepTimeout };
+  c.flags.forEach((v, i) => { f[i + 1] = v ? 1 : 0; });
+  return [
+    cmd(0x18),
+    cmd(0x17, { 2: c.profileIndex ?? 0, 8: 1 }),
+    data(f, 62),
+    cmd(0x02),
+  ];
+}
