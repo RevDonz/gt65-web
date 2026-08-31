@@ -61,11 +61,25 @@ Tempelkan hasilnya ke saya apa adanya.
 
 ### Task 10 langkah 4: daftar nilai mode lampu
 
-Paling aman dari semua eksperimen. Matikan mode kering, lalu untuk `mode` = 0,
-1, 2, … klik Terapkan dan catat efek lampu yang terlihat. Berhenti saat efeknya
-tidak berubah lagi (biasanya di bawah 20).
+Paling aman dari semua eksperimen. Kegagalan terburuknya hanya warna yang salah.
 
-Kegagalan terburuknya hanya warna yang salah.
+Dropdown Mode sekarang berisi 22 nama efek dari tabel string vendor
+(`1033.lan` ID 200–221), dengan indeks daftar sebagai nilai byte. **Urutan itu
+dugaan, bukan fakta** — yang diuji di sini justru apakah dugaannya benar.
+
+Matikan mode kering, lalu pilih tiap entri berurutan dari `0 · Static` sampai
+`21 · Floweriness`, klik Terapkan, dan catat efek lampu yang benar-benar
+terlihat di sebelah nama yang dipilih.
+
+Tiga kemungkinan hasil, semuanya berguna:
+
+- nama cocok dengan efek di seluruh daftar → urutan terkonfirmasi, hapus
+  peringatan di panel Lampu;
+- cocok tapi tergeser konstan → catat pergeserannya;
+- tidak ada hubungan → daftar nama tetap berguna, tapi pemetaan harus
+  disusun ulang dari nol.
+
+Catat juga nilai mana yang tidak menghasilkan perubahan apa pun.
 
 ### Task 11 langkah 3: pemetaan lima flag pengaturan
 
@@ -79,6 +93,18 @@ lalu uji:
 
 Catat flag mana memicu perilaku mana. Setelah selesai, kosongkan semua flag dan
 terapkan ulang.
+
+### Task 11 tambahan: nilai byte waktu tidur lampu
+
+Vendor hanya menawarkan empat pilihan (`1033.lan` ID 270–273: Not Sleep, 1 min,
+5 min, 30 min), dan UI kini mengikuti. Yang belum pasti adalah **nilai byte di
+balik keempat label itu** — kode sementara mengirim angka menitnya (0, 1, 5,
+30); kandidat lain yang sama masuk akal adalah indeks 0–3.
+
+Pilih "1 menit", terapkan, lalu biarkan keyboard diam dan hitung berapa lama
+lampu benar-benar mati. Ulangi untuk "5 menit". Kalau lampu mati jauh lebih
+cepat dari labelnya, encoding-nya kemungkinan indeks, bukan menit — catat dan
+ganti `SLEEP_OPTIONS` di `src/app/panels/SettingsPanel.tsx`.
 
 ### Task 12 langkah 2: monitor
 
