@@ -5,6 +5,35 @@ import { MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS } from '../../gt65/ke
 import type { Entry, Layer } from '../../gt65/protocol';
 import type { Profile } from '../../store/profile';
 
+/**
+ * Nilai yang harus ditampilkan dropdown tombol untuk entri yang sedang
+ * dipilih. Tanpa ini `<select>` menjadi tak terkendali: memilih "A" untuk
+ * tombol 1, lalu klik tombol 2 dan memilih "A" lagi tidak memicu `change`
+ * sama sekali, sehingga tombol 2 tetap memakai binding lamanya sementara
+ * UI menampilkan "A". Pada keyboard yang tidak bisa dibaca balik, selisih
+ * antara yang ditampilkan dan yang ditulis tidak akan pernah ketahuan.
+ *
+ * Dropdown hanya bisa menyatakan tombol biasa tanpa modifier; entri jenis
+ * lain (shortcut ber-modifier, multimedia, mouse, makro, kosong) tidak
+ * punya opsi yang cocok sehingga jatuh ke plakat kosong.
+ */
+export function keySelectValue(entry: Entry | undefined): string {
+  if (!entry || entry.kind !== 'key' || entry.mod !== 0) return '';
+  return HID_KEYS.some((k) => k.usage === entry.usage) ? String(entry.usage) : '';
+}
+
+/**
+ * Terjemahkan pilihan dropdown menjadi usage, atau `null` kalau bukan
+ * pilihan tombol. Dua jebakan yang keduanya berakhir sebagai usage 0 yang
+ * tertulis ke perangkat: `Number('— pilih —')` bernilai `NaN` yang
+ * di-mask `encodeEntry` menjadi 0, dan `Number('')` memang bernilai 0.
+ */
+export function parseKeyChoice(raw: string): number | null {
+  if (raw === '') return null;
+  const usage = Number(raw);
+  return Number.isInteger(usage) ? usage : null;
+}
+
 export function RemapPanel({ profile, onChange, onApply }: {
   profile: Profile;
   onChange: (p: Profile) => void;
@@ -44,10 +73,14 @@ export function RemapPanel({ profile, onChange, onApply }: {
       ) : (
         <div className="grid gap-6 md:grid-cols-4">
           <Group title="Tombol">
-            <select onChange={(e) => assign({
-                      kind: 'key', mod: 0, usage: Number(e.target.value) })}
+            <select value={keySelectValue(entries[selected])}
+                    onChange={(e) => {
+                      const usage = parseKeyChoice(e.target.value);
+                      if (usage === null) return;
+                      assign({ kind: 'key', mod: 0, usage });
+                    }}
                     className="w-full rounded bg-slate-800 px-2 py-1">
-              <option>— pilih —</option>
+              <option value="">— pilih —</option>
               {HID_KEYS.map((k) => (
                 <option key={k.usage} value={k.usage}>{k.label}</option>
               ))}
