@@ -108,7 +108,7 @@ export function onVendorInput(
 ): () => void {
   const handler = (e: HIDInputReportEvent) => {
     if (e.reportId !== VENDOR_INPUT_REPORT_ID) return;
-    cb(new Uint8Array(e.data.buffer));
+    cb(new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength));
   };
   dev.addEventListener('inputreport', handler as EventListener);
   return () => dev.removeEventListener('inputreport', handler as EventListener);

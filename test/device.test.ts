@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
-import { findConfigInterface, sendTransaction, DeviceError } from '../src/gt65/device';
+import { findConfigInterface, sendTransaction, DeviceError, onVendorInput,
+         VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
 
 const withFeature = {
   productName: 'USB DEVICE',
@@ -56,5 +57,56 @@ describe('pengiriman transaksi', () => {
     const dev = { opened: true, sendFeatureReport: vi.fn() } as unknown as HIDDevice;
     await expect(sendTransaction(dev, [new Uint8Array(65)], 0))
       .rejects.toThrow(/64 byte/);
+  });
+});
+
+describe('input vendor', () => {
+  test('meneruskan hanya byte milik DataView, bukan seluruh ArrayBuffer', () => {
+    let handler: ((e: HIDInputReportEvent) => void) | undefined;
+    const dev = {
+      addEventListener: vi.fn((_type: string, h: (e: HIDInputReportEvent) => void) => {
+        handler = h;
+      }),
+      removeEventListener: vi.fn(),
+    } as unknown as HIDDevice;
+
+    const received: Uint8Array[] = [];
+    onVendorInput(dev, (bytes) => received.push(bytes));
+    expect(handler).toBeDefined();
+
+    // ArrayBuffer besar; laporan yang sebenarnya cuma sepotong di tengahnya,
+    // dibungkus offset & panjang non-nol — persis kasus yang mungkin dikirim
+    // implementasi WebHID lain, bukan cuma DataView yang mulai dari byte 0.
+    const buf = new ArrayBuffer(20);
+    new Uint8Array(buf).set([9, 9, 9, 9, 1, 2, 3, 4, 5, 6]);
+    const view = new DataView(buf, 4, 6);
+
+    handler!({
+      reportId: VENDOR_INPUT_REPORT_ID,
+      data: view,
+    } as unknown as HIDInputReportEvent);
+
+    expect(received).toHaveLength(1);
+    expect(Array.from(received[0])).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  test('mengabaikan laporan dengan report ID lain', () => {
+    let handler: ((e: HIDInputReportEvent) => void) | undefined;
+    const dev = {
+      addEventListener: vi.fn((_type: string, h: (e: HIDInputReportEvent) => void) => {
+        handler = h;
+      }),
+      removeEventListener: vi.fn(),
+    } as unknown as HIDDevice;
+
+    const cb = vi.fn();
+    onVendorInput(dev, cb);
+
+    handler!({
+      reportId: 3,
+      data: new DataView(new ArrayBuffer(4)),
+    } as unknown as HIDInputReportEvent);
+
+    expect(cb).not.toHaveBeenCalled();
   });
 });
