@@ -1112,7 +1112,9 @@ export function onVendorInput(
 ): () => void {
   const handler = (e: HIDInputReportEvent) => {
     if (e.reportId !== VENDOR_INPUT_REPORT_ID) return;
-    cb(new Uint8Array(e.data.buffer));
+    // DataView.buffer mengembalikan SELURUH ArrayBuffer; byteOffset dan
+    // byteLength wajib disertakan agar hanya byte milik view ini yang lewat.
+    cb(new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength));
   };
   dev.addEventListener('inputreport', handler as EventListener);
   return () => dev.removeEventListener('inputreport', handler as EventListener);
