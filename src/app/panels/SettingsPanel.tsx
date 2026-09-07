@@ -39,7 +39,7 @@ export function SettingsPanel({ profile, onChange, onApply }: {
   };
 
   return (
-    <section className="panel flex max-w-xl flex-col gap-4 p-4">
+    <section className="panel settings-card flex max-w-3xl flex-col gap-4 p-5">
       <div className="label">Pengaturan perangkat</div>
       {s.flags.map((v, i) => (
         <label key={i} className="flex items-center gap-3 text-[12px]">

@@ -1,6 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { findConfigInterface, sendTransaction, statusByte, DeviceError, onVendorInput,
-         receiveFeatureEcho, VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
+         receiveFeatureEcho, restoreAuthorizedDevice, VENDOR_INPUT_REPORT_ID } from '../src/gt65/device';
+
+afterEach(() => vi.unstubAllGlobals());
 
 const withFeature = {
   productName: 'USB DEVICE',
@@ -36,6 +38,27 @@ describe('pemilihan interface', () => {
     const e = new DeviceError('mode dongle', 'wrongmode');
     expect(e.kind).toBe('wrongmode');
     expect(e).toBeInstanceOf(Error);
+  });
+});
+
+describe('pemulihan perangkat yang sudah diizinkan', () => {
+  test('membuka kembali interface konfigurasi tanpa dialog pemilihan', async () => {
+    const open = vi.fn().mockResolvedValue(undefined);
+    const authorized = {
+      vendorId: 0x05ac, productId: 0x024f, productName: 'GT65',
+      opened: false, open, collections: withFeature.collections,
+    } as unknown as HIDDevice;
+    const getDevices = vi.fn().mockResolvedValue([authorized]);
+    vi.stubGlobal('navigator', { hid: { getDevices } });
+
+    await expect(restoreAuthorizedDevice()).resolves.toBe(authorized);
+    expect(getDevices).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledOnce();
+  });
+
+  test('mengembalikan null jika izin atau keyboard tidak tersedia', async () => {
+    vi.stubGlobal('navigator', { hid: { getDevices: vi.fn().mockResolvedValue([]) } });
+    await expect(restoreAuthorizedDevice()).resolves.toBeNull();
   });
 });
 

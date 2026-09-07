@@ -1,8 +1,19 @@
-import { useCallback, useState } from 'react';
-import { requestDevice, sendTransaction, DeviceError } from '../gt65/device';
+import { useCallback, useEffect, useState } from 'react';
+import { requestDevice, restoreAuthorizedDevice, sendTransaction, DeviceError } from '../gt65/device';
 import { formatLogText, makeLogEntry, makeReadbackList, pushLogEntry } from './log';
 import type { LogEntry } from './log';
 import { sendToDevLogSink } from './devLogSink';
+
+const SESSION_LOG_KEY = 'gt65-session-log';
+
+function loadSessionLog(): LogEntry[] {
+  try {
+    const value = sessionStorage.getItem(SESSION_LOG_KEY);
+    return value ? JSON.parse(value) as LogEntry[] : [];
+  } catch {
+    return [];
+  }
+}
 
 export type Status = 'idle' | 'connecting' | 'connected' | 'error';
 
@@ -26,8 +37,24 @@ export function useDevice(dryRun: boolean) {
   const [device, setDevice] = useState<HIDDevice | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [lastPackets, setLastPackets] = useState<Uint8Array[]>([]);
-  const [log, setLog] = useState<LogEntry[]>([]);
+  const [log, setLog] = useState<LogEntry[]>(loadSessionLog);
+
+  useEffect(() => {
+    let active = true;
+    void restoreAuthorizedDevice()
+      .then((restored) => {
+        if (!active || !restored) return;
+        setDevice(restored);
+        setStatus('connected');
+        setError(null);
+      })
+      .catch((e) => {
+        if (!active) return;
+        setStatus('error');
+        setError(e instanceof DeviceError ? e.message : String(e));
+      });
+    return () => { active = false; };
+  }, []);
 
   const connect = useCallback(async () => {
     setStatus('connecting');
@@ -43,12 +70,9 @@ export function useDevice(dryRun: boolean) {
 
   /**
    * Menerima satu transaksi atau beberapa sekaligus. Beberapa transaksi
-   * tetap dikirim terpisah dan berurutan — persis seperti software vendor —
-   * tapi pratinjau mode kering menampilkan gabungan semuanya. Sebelumnya
-   * tiap transaksi menimpa `lastPackets`, sehingga pemulihan bawaan (dua
-   * remap 13 paket, pencahayaan, pengaturan) hanya memperlihatkan 4 paket
-   * terakhir: justru dua penulisan terbesar yang tak pernah terlihat oleh
-   * pengguna yang sedang meninjau operasi paling berisiko di aplikasi ini.
+   * tetap dikirim terpisah dan berurutan — persis seperti software vendor.
+   * Seluruh paket dan balikan disimpan pada Log; panel kerja tidak membuat
+   * salinan preview teknis kedua.
    *
    * `label` bersifat opsional supaya penambahan parameter ini tidak memaksa
    * setiap pemanggilan lama berubah bentuk (mis. membungkus transaksi ke
@@ -67,7 +91,6 @@ export function useDevice(dryRun: boolean) {
     // karena keduanya tidak pernah memanggil sendTransaction sama sekali.
     let readbacks: Uint8Array[] = [];
 
-    setLastPackets(packets);
 
     switch (decision) {
       case 'dry':
@@ -104,7 +127,11 @@ export function useDevice(dryRun: boolean) {
       outcome,
       readbacks: makeReadbackList(packets, readbacks),
     });
-    setLog((prev) => pushLogEntry(prev, entry));
+    setLog((prev) => {
+      const next = pushLogEntry(prev, entry);
+      try { sessionStorage.setItem(SESSION_LOG_KEY, JSON.stringify(next)); } catch { /* best effort */ }
+      return next;
+    });
 
     // Salin entri ini ke dev-server log sink (lihat devLogSink.ts) — tak
     // aktif di build produksi, dan kegagalannya tak pernah memengaruhi
@@ -116,5 +143,5 @@ export function useDevice(dryRun: boolean) {
     }));
   }, [device, dryRun]);
 
-  return { device, status, error, connect, send, lastPackets, log };
+  return { device, status, error, connect, send, log };
 }

@@ -35,28 +35,28 @@ export function DeviceBar({
   onBackup: () => void;
 }) {
   return (
-    <header className="border-b border-[var(--edge)] bg-[var(--panel)]">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2">
-        <div className="flex items-baseline gap-2 pr-1">
-          <span className="text-[15px] font-bold tracking-[0.06em]">GT65</span>
-          <span className="label">Konfigurator</span>
+    <header className="device-bar">
+      <div className="device-bar-inner">
+        <div className="brand-lockup">
+          <span className="brand-mark">G</span>
+          <span className="brand-copy">
+            <strong>GT65</strong>
+            <small>Keyboard Studio</small>
+          </span>
         </div>
 
-        <span className="h-5 w-px bg-[var(--edge)]" />
+        <div className="device-cluster">
+          <span className="pill" title={LABEL[status]}>
+            <span className="dot" data-state={status} />
+            <span>{LABEL[status]}</span>
+            {status === 'connected' && productName && (
+              <span className="num text-[var(--ink-3)]">{productName}</span>
+            )}
+          </span>
+          <button className="btn" onClick={onConnect}>Sambungkan</button>
+        </div>
 
-        <span className="pill" title={LABEL[status]}>
-          <span className="dot" data-state={status} />
-          <span>{LABEL[status]}</span>
-          {status === 'connected' && productName && (
-            <span className="num text-[var(--ink-3)]">{productName}</span>
-          )}
-        </span>
-
-        <button className="btn" onClick={onConnect}>Sambungkan</button>
-
-        <span className="h-5 w-px bg-[var(--edge)]" />
-
-        {actions}
+        <div className="profile-actions">{actions}</div>
 
         {/*
           Lencana tenang, bukan alarm: memakai warna warn (kuning), bukan
@@ -75,13 +75,16 @@ export function DeviceBar({
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <span className="label">Mode kering</span>
+        <div className="safety-control">
+          <span className="safety-copy">
+            <strong>Pratinjau aman</strong>
+            <small>Blokir penulisan ke keyboard</small>
+          </span>
           <button type="button" role="switch" aria-checked={dryRun}
                   className="switch" data-on={dryRun}
                   onClick={() => onToggleDryRun(!dryRun)}>
             <span className="switch-track"><span className="switch-knob" /></span>
-            <span className="text-[11px] font-semibold tracking-[0.08em]"
+            <span className="switch-state"
                   style={{ color: dryRun ? 'var(--accent)' : 'var(--crit)' }}>
               {dryRun ? 'AKTIF' : 'MATI'}
             </span>

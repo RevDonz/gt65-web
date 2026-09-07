@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { DeviceBar } from './DeviceBar';
+import { HidAccessBanner } from './HidAccessBanner';
 import { useDevice } from './useDevice';
-import { formatHex } from './hex';
+
 import { RestoreButton } from './RestoreButton';
 import { LightingPanel } from './panels/LightingPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
@@ -19,15 +20,68 @@ import {
 import type { Profile } from '../store/profile';
 import { OverwriteGuardModal } from './OverwriteGuardModal';
 
-const TABS = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'] as const;
-type Tab = (typeof TABS)[number];
+export const PAGES = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'] as const;
+export type Page = (typeof PAGES)[number];
+
+export const PAGE_HREF: Record<Page, string> = {
+  Remap: '/',
+  Lampu: '/lighting.html',
+  Tester: '/tester.html',
+  Pengaturan: '/settings.html',
+  Monitor: '/monitor.html',
+  Log: '/log.html',
+};
+
+const DRY_RUN_KEY = 'gt65-dry-run';
+
+function loadDryRun(): boolean {
+  try {
+    const saved = localStorage.getItem(DRY_RUN_KEY);
+    return saved === null ? true : saved !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+const TAB_META: Record<Page, { eyebrow: string; title: string; description: string }> = {
+  Remap: {
+    eyebrow: 'Keymap',
+    title: 'Atur fungsi setiap tombol',
+    description: 'Pilih layer, klik tombol pada keyboard, lalu tentukan fungsi barunya.',
+  },
+  Lampu: {
+    eyebrow: 'Lighting',
+    title: 'Rancang suasana meja',
+    description: 'Pilih efek, warna, kecepatan, kecerahan, dan arah animasi GT65.',
+  },
+  Tester: {
+    eyebrow: 'Diagnostics',
+    title: 'Pastikan setiap tombol merespons',
+    description: 'Tekan tombol fisik untuk melihat event yang benar-benar sampai ke sistem operasi.',
+  },
+  Pengaturan: {
+    eyebrow: 'Device',
+    title: 'Pengaturan perangkat',
+    description: 'Kelola opsi firmware yang ditemukan dari software vendor dan hasil pengujian perangkat.',
+  },
+  Monitor: {
+    eyebrow: 'Protocol',
+    title: 'Pantau laporan vendor',
+    description: 'Amati event mentah dari interface vendor saat menyelidiki perilaku perangkat.',
+  },
+  Log: {
+    eyebrow: 'Activity',
+    title: 'Riwayat transaksi',
+    description: 'Tinjau paket, keputusan transport, dan hasil readback dari sesi ini.',
+  },
+};
 
 /**
  * Ikon rail digambar inline sebagai SVG — bukan pustaka ikon dan bukan
  * emoji. Semuanya bergaris 1.5px pada kotak 24 supaya seluruh rail terbaca
  * sebagai satu set, seperti sablon pada panel alat.
  */
-const ICONS: Record<Tab, ReactNode> = {
+const ICONS: Record<Page, ReactNode> = {
   Remap: (
     <>
       <rect x="3" y="4" width="8" height="8" rx="1.5" />
@@ -66,7 +120,7 @@ const ICONS: Record<Tab, ReactNode> = {
   Log: <path d="M4 6h16M4 10h16M4 14h11M4 18h7" />,
 };
 
-function RailIcon({ tab }: { tab: Tab }) {
+function RailIcon({ tab }: { tab: Page }) {
   return (
     <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
          stroke="currentColor" strokeWidth="1.5"
@@ -82,9 +136,9 @@ function exportFilename(name: string): string {
   return `${slug || 'profil-gt65'}.json`;
 }
 
-export function App() {
-  const [dryRun, setDryRun] = useState(true);
-  const [tab, setTab] = useState<Tab>('Lampu');
+export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
+  const [dryRun, setDryRun] = useState(loadDryRun);
+  const tab = initialPage;
   const [profile, setProfileState] = useState<Profile>(loadProfile);
   const [importError, setImportError] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -93,6 +147,11 @@ export function App() {
   const [pendingRemapLayer, setPendingRemapLayer] = useState<Layer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dev = useDevice(dryRun);
+
+  const setPersistentDryRun = (value: boolean) => {
+    setDryRun(value);
+    try { localStorage.setItem(DRY_RUN_KEY, String(value)); } catch { /* best effort */ }
+  };
 
   /**
    * Tiap suntingan panel langsung tersimpan; tidak ada tombol simpan
@@ -186,13 +245,17 @@ export function App() {
     </>
   );
 
+  const meta = TAB_META[tab];
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="app-shell">
       <DeviceBar status={dev.status} error={dev.error} dryRun={dryRun}
                  productName={dev.device?.productName ?? null}
-                 onConnect={dev.connect} onToggleDryRun={setDryRun}
+                 onConnect={dev.connect} onToggleDryRun={setPersistentDryRun}
                  actions={profileActions}
                  neverBackedUp={!profile.backedUp} onBackup={handleExport} />
+
+      <HidAccessBanner />
 
       {pendingRemapLayer !== null && (
         <OverwriteGuardModal
@@ -207,20 +270,25 @@ export function App() {
         />
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="app-body">
         <nav role="tablist" aria-orientation="vertical" aria-label="Panel"
-             className="w-[78px] shrink-0 border-r border-[var(--edge)]
-                        bg-[var(--panel)] pt-1">
-          {TABS.map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t}
-                    className="rail-item" onClick={() => setTab(t)}>
+             className="side-nav">
+          <div className="side-nav-label">Workspace</div>
+          {PAGES.map((t) => (
+            <a key={t} role="tab" aria-label={t} aria-selected={tab === t}
+               aria-current={tab === t ? 'page' : undefined}
+               className="rail-item" href={PAGE_HREF[t]}>
               <RailIcon tab={t} />
-              {t}
-            </button>
+              <span>{t}</span>
+            </a>
           ))}
+          <div className="side-nav-foot">
+            <span className="num">GT-65 / 65%</span>
+            <span>WebHID configurator</span>
+          </div>
         </nav>
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="workspace">
           {/*
             Strip mode kering. Sakelarnya ada di header, tapi keadaan yang
             berlaku harus terbaca dari area kerja juga — dua kali pengguna
@@ -241,7 +309,15 @@ export function App() {
             </span>
           </div>
 
-          <div className="flex-1 px-5 py-5">
+          <div className="workspace-scroll">
+            <header className="page-heading">
+              <div>
+                <div className="label">{meta.eyebrow}</div>
+                <h1>{meta.title}</h1>
+                <p>{meta.description}</p>
+              </div>
+              <div className="page-context num">{profile.name}</div>
+            </header>
             {importError && (
               <p className="panel mb-4 px-3 py-2 text-[12px]"
                  style={{ borderColor: 'var(--crit)', color: 'var(--crit)' }}>
@@ -261,7 +337,7 @@ export function App() {
               </p>
             )}
 
-            <div key={tab} className="panel-swap">
+            <div key={tab} className="panel-swap page-content">
               {tab === 'Remap' && (
                 <RemapPanel profile={profile} onChange={setProfile}
                             onApply={handleRemapApply} />
@@ -294,15 +370,6 @@ export function App() {
               )}
             </div>
 
-            {dev.lastPackets.length > 0 && (
-              <div className="mt-6">
-                <div className="label mb-1.5">Paket terakhir</div>
-                <pre className="well num overflow-x-auto p-3 text-[10px]
-                                leading-[1.7] text-[var(--ink-2)]">
-                  {formatHex(dev.lastPackets)}
-                </pre>
-              </div>
-            )}
           </div>
         </main>
       </div>

@@ -114,20 +114,16 @@ export function RemapPanel({ profile, onChange, onApply }: {
         <span className="text-[11px] text-[var(--ink-3)]">
           {selected === null
             ? 'Klik satu tombol untuk mengubah fungsinya.'
-            : 'Pilih fungsi baru di kolom kanan.'}
+            : 'Pilih fungsi baru di panel bawah.'}
         </span>
         <button className="btn btn-primary ml-auto" onClick={() => onApply(layer)}>
           Terapkan layer ini
         </button>
       </div>
 
-      {/*
-        Papan tetap terlihat sewaktu memilih fungsi: pemilih duduk sebagai
-        kolom kanan, bukan di bawah papan. Di viewport sempit ia jatuh ke
-        bawah papan seperti biasa.
-      */}
-      <div className={`grid gap-4 ${
-        selected === null ? '' : 'lg:grid-cols-[minmax(0,1fr)_330px]'}`}>
+      {/* Keyboard selalu memakai lebar penuh. Editor ditumpuk di bawah agar
+          tidak pernah menimpa atau mempersempit kanvas keyboard. */}
+      <div className="flex flex-col gap-5" data-remap-layout="stacked">
         <div className="flex flex-col gap-3">
           <KeyboardGrid entries={entries} defaultEntries={defaultEntries}
                         selected={selected} onSelect={setSelected} />
@@ -147,9 +143,9 @@ export function RemapPanel({ profile, onChange, onApply }: {
         </div>
 
         {selected !== null && (
-          <aside className="panel flex max-h-[70vh] flex-col overflow-y-auto">
-            <div className="sticky top-0 flex items-baseline gap-2 border-b
-                            border-[var(--edge)] bg-[var(--panel)] px-3 py-2.5">
+          <aside className="panel flex flex-col overflow-hidden">
+            <div className="flex items-baseline gap-2 border-b
+                            border-[var(--edge)] bg-[var(--panel)] px-4 py-3">
               <span className="text-[13px] font-semibold">{key?.name ?? '?'}</span>
               <span className="num text-[10px] text-[var(--ink-3)]">
                 idx {selected}
@@ -157,13 +153,13 @@ export function RemapPanel({ profile, onChange, onApply }: {
               <button className="btn btn-quiet ml-auto px-2 py-0.5 text-[11px]"
                       onClick={() => setSelected(null)}>Tutup</button>
             </div>
-            <div className="px-3 py-2 text-[11px] text-[var(--ink-2)]">
+            <div className="px-4 py-3 text-[11px] text-[var(--ink-2)]">
               Sekarang: <span style={{ color: 'var(--ink)' }}>
                 {describeEntry(entries[selected])}
               </span>
             </div>
 
-            <div className="flex flex-col gap-4 px-3 pb-4">
+            <div className="grid gap-4 px-4 pb-4 md:grid-cols-2 xl:grid-cols-3">
               <Group title="Tombol">
                 <select value={keySelectValue(entries[selected])}
                         onChange={(e) => {
