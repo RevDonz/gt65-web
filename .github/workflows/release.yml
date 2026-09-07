@@ -85,15 +85,40 @@ jobs:
       - name: Verifikasi isi paket
         run: |
           set -euo pipefail
-          dpkg-deb -c release/gt65-configurator_*_amd64.deb | grep -q 'usr/lib/udev/rules.d/70-gt65.rules'
-          dpkg-deb -f release/gt65-configurator_*_amd64.deb Depends | grep -q 'libasound2 (>= 1.0.16)'
-          dpkg-deb -c release/gt65-configurator_*_amd64.deb | grep -q 'usr/share/metainfo/'
-          rpm -qlp release/gt65-configurator-*.x86_64.rpm | grep -q '70-gt65.rules'
-          # arm64 tidak boleh cuma "ada" — isinya harus diverifikasi juga,
-          # supaya paket arm64 yang terbangun tapi rusak tidak lolos.
-          dpkg-deb -c release/gt65-configurator_*_arm64.deb | grep -q 'usr/lib/udev/rules.d/70-gt65.rules'
-          dpkg-deb -f release/gt65-configurator_*_arm64.deb Depends | grep -q 'libasound2 (>= 1.0.16)'
-          dpkg-deb -c release/gt65-configurator_*_arm64.deb | grep -q 'usr/share/metainfo/'
+
+          # Daftar isi ditulis ke berkas lebih dulu, TIDAK disalurkan langsung
+          # ke `grep -q`. `grep -q` keluar pada kecocokan pertama dan menutup
+          # pipa, lalu subproses tar milik dpkg-deb kena EPIPE saat menulis
+          # sisa ~95 MB dan gagal dengan "tar: stdout: write error". Dengan
+          # `set -o pipefail` itu menjatuhkan seluruh langkah, padahal
+          # paketnya sendiri baik-baik saja. Terjadi sungguhan pada tag v0.1.0
+          # pertama; jangan kembalikan ke bentuk pipa.
+          mkdir -p /tmp/pkgcheck
+          for arch in amd64 arm64; do
+            deb=$(ls release/gt65-configurator_*_"$arch".deb)
+            dpkg-deb -c "$deb" > "/tmp/pkgcheck/$arch.list"
+            dpkg-deb -f "$deb" Depends > "/tmp/pkgcheck/$arch.depends"
+
+            grep -q 'usr/lib/udev/rules.d/70-gt65.rules' "/tmp/pkgcheck/$arch.list"
+            grep -q 'usr/share/metainfo/' "/tmp/pkgcheck/$arch.list"
+            grep -q 'usr/share/applications/gt65-configurator.desktop' "/tmp/pkgcheck/$arch.list"
+            grep -q 'libasound2 (>= 1.0.16)' "/tmp/pkgcheck/$arch.depends"
+
+            # Aturan udev harus 0644. fpm menyalin mode sumber apa adanya, jadi
+            # umask runner bisa membuatnya 0664 tanpa memicu galat apa pun.
+            mode=$(awk '/usr\/lib\/udev\/rules.d\/70-gt65.rules/ {print $1}' "/tmp/pkgcheck/$arch.list")
+            test "$mode" = "-rw-r--r--" || {
+              echo "Mode aturan udev pada $arch salah: $mode (harus -rw-r--r--)" >&2
+              exit 1
+            }
+            echo "deb $arch: isi terverifikasi (udev $mode)"
+          done
+
+          rpm -qlp release/gt65-configurator-*.x86_64.rpm > /tmp/pkgcheck/rpm.list
+          grep -q '70-gt65.rules' /tmp/pkgcheck/rpm.list
+          grep -q 'metainfo' /tmp/pkgcheck/rpm.list
+          echo "rpm x86_64: isi terverifikasi"
+
           echo "Isi paket terverifikasi."
 
       - name: Hitung checksum
