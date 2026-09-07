@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { DeviceBar } from './DeviceBar';
+import { HidAccessBanner } from './HidAccessBanner';
 import { useDevice } from './useDevice';
 
 import { RestoreButton } from './RestoreButton';
@@ -253,6 +254,8 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
                  onConnect={dev.connect} onToggleDryRun={setPersistentDryRun}
                  actions={profileActions}
                  neverBackedUp={!profile.backedUp} onBackup={handleExport} />
+
+      <HidAccessBanner />
 
       {pendingRemapLayer !== null && (
         <OverwriteGuardModal

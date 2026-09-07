@@ -268,6 +268,53 @@ button { -webkit-tap-highlight-color: transparent; }
 .strip[data-mode='live'] { background: rgba(241,115,125,.07); color: #efb6bb; }
 .strip[data-mode='live'] .label { color: var(--crit); }
 
+/* Spanduk peringatan hidraw hanya-baca — palet sama dengan .strip[data-mode='live'] */
+.hid-access-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px clamp(22px,4vw,58px) 0;
+  padding: 14px 16px;
+  border: 1px solid var(--crit);
+  border-radius: 8px;
+  background: rgba(241,115,125,.07);
+  color: #efb6bb;
+}
+.hid-access-banner strong { color: var(--crit); font-size: 13px; }
+.hid-access-banner p { margin: 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.hid-access-banner code { font-family: var(--font-num); font-size: .92em; color: var(--ink); }
+.hid-access-banner pre {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: #0d0f11;
+  color: var(--ink);
+  font-family: var(--font-num);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+.hid-access-banner button {
+  align-self: flex-start;
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--crit);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--crit);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.hid-access-banner button:hover { background: rgba(241,115,125,.12); }
+
 /* Live lighting illustration */
 .lighting-preview { margin: 0; padding: 16px; border: 1px solid var(--edge); border-radius: 8px; background: #0b0d0f; overflow: hidden; }
 .lighting-preview figcaption { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
