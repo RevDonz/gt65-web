@@ -41,6 +41,15 @@ Unduh dari [halaman Rilis](https://github.com/RevDonz/gt65-web/releases).
 | Fedora, RHEL, openSUSE | `.rpm` | otomatis |
 | Arch, Void, Gentoo, NixOS, immutable | `.AppImage` | manual |
 
+**Catatan verifikasi.** Pemasangan `.deb` maupun `.rpm` di bawah belum pernah
+diuji sungguhan di distro mana pun: `sudo` di mesin verifikasi minta sandi
+interaktif, jadi `apt install`/`dnf install` belum pernah benar-benar
+dijalankan di sana. Berkas `.rpm` itu sendiri belum pernah dibangun di mesin
+itu pula — `rpmbuild` tidak terpasang — sehingga `.rpm` pertama kali dibangun
+oleh CI, bukan diverifikasi secara lokal terlebih dahulu. Artefak arm64 juga
+belum pernah dibangun di mesin ini. Perilaku pemasangan di Ubuntu 24.04 dengan
+`apparmor_restrict_unprivileged_userns=1` belum diuji.
+
 ```bash
 # Debian dan turunannya — apt menyelesaikan dependensi, dpkg -i tidak
 sudo apt install ./gt65-configurator_0.1.0_amd64.deb
