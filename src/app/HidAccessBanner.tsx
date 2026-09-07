@@ -19,8 +19,19 @@ interface HidStatus {
   rulesPath: string | null;
 }
 
-function perintahPasang(rulesPath: string): string {
-  return `sudo install -m644 ${rulesPath} /etc/udev/rules.d/70-gt65.rules
+/**
+ * Mengutip lintasan untuk shell POSIX, dengan escape untuk kutip tunggal di
+ * dalamnya. R-C1: `process.resourcesPath` pada paket .deb/.rpm terpasang
+ * adalah `/opt/GT65 Configurator/resources` — berspasi. Tanpa kutip, perintah
+ * yang disalin pengguna terpotong di spasi itu dan `install` gagal mencari
+ * berkas yang tidak ada.
+ */
+function q(p: string): string {
+  return `'${p.replace(/'/g, "'\\''")}'`;
+}
+
+export function perintahPasang(rulesPath: string): string {
+  return `sudo install -m644 ${q(rulesPath)} /etc/udev/rules.d/70-gt65.rules
 sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw --action=add`;
 }
 
