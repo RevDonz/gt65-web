@@ -9,7 +9,7 @@
     "noUnusedLocals": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["w3c-web-hid", "vite/client"]
+    "types": ["node", "w3c-web-hid", "vite/client"]
   },
   "include": ["src", "test"]
 }
