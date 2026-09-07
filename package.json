@@ -12,6 +12,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/check-fonts.mjs",
     "build:electron": "node scripts/build-electron.mjs",
+    "typecheck:electron": "tsc -p tsconfig.electron.json",
     "dev:desktop": "node scripts/dev-electron.mjs",
     "pack:linux": "npm run build && npm run build:electron && electron-builder --linux --publish never",
     "preview": "vite preview",
