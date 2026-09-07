@@ -7,7 +7,7 @@ Konfigurator desktop untuk keyboard VortexSeries GT65 di Linux.
 | Ubuntu, Debian, Mint, Pop!_OS | `gt65-configurator_*_amd64.deb` |
 | Fedora, RHEL, openSUSE | `gt65-configurator-*.x86_64.rpm` |
 | Arch, dan lainnya | `gt65-configurator-*-x86_64.AppImage` |
-| ARM64 (Asahi, Raspberry Pi) | berkas `arm64` |
+| ARM64 (Asahi, Raspberry Pi) | `gt65-configurator_*_arm64.deb` atau `gt65-configurator-*-arm64.AppImage` — **rpm hanya dibangun untuk x64**, tidak ada `.rpm` arm64 |
 
 Pasang `.deb` lewat `apt install ./...deb` dan `.rpm` lewat `dnf install ./...rpm`
 (bukan `dpkg -i`/`rpm -i` — lihat "Memasang" di bawah) supaya dependensi
@@ -51,12 +51,13 @@ cabut-colok") tidak pernah berjalan.
   `sudo` di mesin build membutuhkan sandi interaktif (tidak tersedia di CI/skrip
   ini), `rpmbuild` tidak terpasang di mesin verifikasi, dan Mint 22.2 yang
   sempat dicoba mengembalikan `apparmor_restrict_unprivileged_userns` ke 0.
-  Yang SUDAH diverifikasi: isi paket lewat `dpkg-deb -c`/`rpm -qlp`, field
+  Yang SUDAH diverifikasi: isi paket lewat `dpkg-deb -c`, field
   control paket, skrip maintainer (`postinst`/`postrm`) **setelah** makro fpm
   disubstitusi, dan mode berkas hasil build. Yang BELUM diverifikasi: instalasi
-  nyata di distro mana pun, pembangunan target rpm dari mesin ini, perilaku di
-  Ubuntu 24.04+ dengan pembatasan userns AppArmor aktif, dan artefak arm64
-  berjalan di perangkat arm64 sungguhan.
+  nyata di distro mana pun, pembangunan target rpm dari mesin ini (`rpmbuild`
+  tidak terpasang, jadi belum pernah ada berkas `.rpm` untuk diperiksa sama
+  sekali), perilaku di Ubuntu 24.04+ dengan pembatasan userns AppArmor aktif,
+  dan artefak arm64 berjalan di perangkat arm64 sungguhan.
 - **Keyboard harus tersambung lewat kabel USB.** Lewat dongle 2.4 GHz, kanal
   konfigurasi tidak tersedia dan aplikasi akan menolak dengan pesan jelas.
 
