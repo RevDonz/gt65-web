@@ -31,6 +31,42 @@ sebagai cadangan — lihat "Cadangan profil" di bawah.
 **Mode kering aktif secara bawaan.** Aplikasi menampilkan paket yang akan
 dikirim tanpa benar-benar mengirimnya. Matikan hanya kalau Anda siap menulis.
 
+## Memasang aplikasi desktop
+
+Unduh dari [halaman Rilis](https://github.com/RevDonz/gt65-web/releases).
+
+| Distro | Berkas | Aturan udev |
+|---|---|---|
+| Ubuntu, Debian, Mint, Pop!_OS | `.deb` | otomatis |
+| Fedora, RHEL, openSUSE | `.rpm` | otomatis |
+| Arch, Void, Gentoo, NixOS, immutable | `.AppImage` | manual |
+
+```bash
+# Debian dan turunannya
+sudo dpkg -i gt65-configurator_0.1.0_amd64.deb
+
+# Fedora dan turunannya
+sudo rpm -i gt65-configurator-0.1.0.x86_64.rpm
+
+# AppImage
+chmod +x gt65-configurator-0.1.0-x86_64.AppImage
+./gt65-configurator-0.1.0-x86_64.AppImage
+```
+
+Pengguna AppImage harus memasang aturan udev sendiri. Aplikasi akan
+memberitahu bila belum terpasang, dan berkasnya ada di dalam bundel:
+
+```bash
+sudo install -m644 70-gt65.rules /etc/udev/rules.d/70-gt65.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw --action=add
+```
+
+Tanpa aturan itu keyboard tetap terdeteksi, tetapi setiap perubahan gagal
+tanpa pesan galat — Chromium mundur ke mode hanya-baca secara diam-diam.
+
+Versi web tetap tersedia dan tidak digantikan. Keduanya berbagi basis kode
+yang sama.
+
 ## Yang belum diketahui
 
 Tiga hal berikut menunggu penemuan lewat hardware sungguhan dan belum bisa
@@ -50,12 +86,13 @@ dianggap final:
 ## Linux: izin perangkat
 
 `/dev/hidraw*` bawaannya hanya bisa diakses root, sehingga browser tidak bisa
-membuka keyboard. Pasang udev rule:
+membuka keyboard. Pasang aturan udev dari `build/70-gt65.rules` — berkas ini
+juga yang dirilis bersama paket desktop, jadi isinya satu-satunya sumber
+kebenaran:
 
 ```bash
-echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="05ac", ATTRS{idProduct}=="024f", TAG+="uaccess"' \
-  | sudo tee /etc/udev/rules.d/70-gt65.rules
-sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo install -m644 build/70-gt65.rules /etc/udev/rules.d/70-gt65.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw --action=add
 ```
 
 Colok ulang keyboard setelahnya.
@@ -76,8 +113,11 @@ atau HTTPS.
 ## Pengembangan
 
 ```bash
-npm test        # golden test byte, tidak butuh keyboard
-npm run build
+npm test                # golden test byte, tidak butuh keyboard
+npm run build           # renderer
+npm run build:electron  # proses main
+npm run dev:desktop     # vite + Electron, hot reload
+npm run pack:linux      # bangun paket ke release/
 ```
 
 Kesalahan protokol tidak memunculkan error — keyboard mengabaikan paket yang
