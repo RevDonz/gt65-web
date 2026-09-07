@@ -341,14 +341,27 @@ function createWindow(): void {
    * sama, dan pesan .catch() ("melempar sebelum halaman mulai dimuat") keliru
    * untuk kasus itu. `sudahLapor` memastikan hanya satu dialog tampil, dengan
    * pesan yang sesuai jalur yang benar-benar menyalakannya duluan.
+   *
+   * Jendela ini hidup untuk seluruh umur aplikasi, dan nav-rail (App.tsx)
+   * memakai <a href> antar tab — tiap klik adalah navigasi top-level baru di
+   * webContents yang sama, begitu pula Muat ulang / Ctrl+R. `sudahLapor` HARUS
+   * direset di awal tiap upaya navigasi ('did-start-loading'), kalau tidak
+   * penanda ini tetap true selamanya setelah kegagalan pertama dan setiap
+   * kegagalan berikutnya gagal senyap — tanpa dialog, tanpa log. Karena
+   * 'did-start-loading' selalu menyala sebelum 'did-fail-load' pada upaya
+   * yang sama, reset ini tidak membuka kembali dedup dialog-ganda di atas.
+   * console.error juga dipindah ke ATAS guard `sudahLapor`: log harus selalu
+   * tercatat, bahkan pada kegagalan yang dialognya kita redam.
    */
   let sudahLapor = false;
+  win.webContents.on('did-start-loading', () => { sudahLapor = false; });
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (!isMainFrame || sudahLapor) return;
-    sudahLapor = true;
+    if (!isMainFrame) return;
     console.error(
       `[gt65] Gagal memuat jendela (${errorCode} ${errorDescription}): ${validatedURL}`,
     );
+    if (sudahLapor) return;
+    sudahLapor = true;
     win.show();
     dialog.showErrorBox(
       'GT65 Configurator gagal dimuat',
