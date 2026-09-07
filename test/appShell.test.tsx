@@ -11,16 +11,25 @@ beforeAll(() => {
 // Setiap mountApp() memuat profil dari localStorage — kalau satu tes
 // menyunting profil (mis. mengonfirmasi peringatan menimpa), tes berikutnya
 // di file ini tidak boleh mewarisi provenance-nya secara diam-diam.
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
-async function mountApp() {
+type Page = 'Remap' | 'Lampu' | 'Tester' | 'Pengaturan' | 'Monitor' | 'Log';
+
+async function mountApp(initialPage: Page = 'Remap') {
   const el = document.createElement('div');
   document.body.appendChild(el);
   const root = createRoot(el);
-  await act(async () => { root.render(<App />); });
+  let page = initialPage;
+  const renderPage = async () => {
+    await act(async () => { root.render(<App key={page} initialPage={page} />); });
+  };
+  await renderPage();
   const clickTab = async (name: string) => {
-    const btn = [...el.querySelectorAll('button')].find((b) => b.textContent === name)!;
-    await act(async () => { btn.click(); });
+    page = name as Page;
+    await renderPage();
   };
   const cleanup = async () => {
     await act(async () => { root.unmount(); });
@@ -30,9 +39,13 @@ async function mountApp() {
 }
 
 describe('kerangka aplikasi', () => {
-  test('tiap tab bisa dibuka tanpa melempar', async () => {
+  test('default membuka Remap dan navigasi memakai halaman penuh', async () => {
     const { el, clickTab, cleanup } = await mountApp();
-    for (const name of ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log']) {
+    expect(el.querySelector('h1')?.textContent).toContain('Atur fungsi');
+    const pages: Page[] = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'];
+    expect([...el.querySelectorAll('nav a')].map((a) => a.getAttribute('href')))
+      .toEqual(['/', '/lighting.html', '/tester.html', '/settings.html', '/monitor.html', '/log.html']);
+    for (const name of pages) {
       await clickTab(name);
       expect(el.textContent).toContain(name);
     }
@@ -56,6 +69,53 @@ describe('kerangka aplikasi', () => {
 
     expect(strip().getAttribute('data-mode')).toBe('live');
     expect(strip().textContent).toContain('menulis langsung ke keyboard');
+    await cleanup();
+  });
+
+  test('pilihan mode kering bertahan setelah pindah halaman', async () => {
+    const { el, clickTab, cleanup } = await mountApp();
+    const switchControl = () => el.querySelector('[role="switch"]') as HTMLButtonElement;
+    await act(async () => { switchControl().click(); });
+    expect(switchControl().getAttribute('aria-checked')).toBe('false');
+
+    await clickTab('Lampu');
+    expect(switchControl().getAttribute('aria-checked')).toBe('false');
+    expect(el.querySelector('.strip')?.getAttribute('data-mode')).toBe('live');
+    await cleanup();
+  });
+});
+
+describe('halaman Lighting', () => {
+  test('preview animasi mengikuti mode, kecepatan, kecerahan, dan warna', async () => {
+    const { el, cleanup } = await mountApp('Lampu');
+    const preview = () => el.querySelector('[data-lighting-preview]') as HTMLElement;
+    expect(preview()).not.toBeNull();
+    expect(preview().querySelectorAll('.preview-key')).toHaveLength(24);
+
+    const mode = el.querySelector<HTMLSelectElement>('select')!;
+    const numberInputs = el.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    const speed = numberInputs[0];
+    const brightness = numberInputs[1];
+    const setInput = (input: HTMLInputElement, value: string) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!
+        .set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    await act(async () => {
+      mode.value = '11';
+      mode.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      setInput(speed, '4');
+    });
+    await act(async () => {
+      setInput(brightness, '1');
+    });
+
+    expect(preview().dataset.mode).toBe('11');
+    expect(preview().dataset.speed).toBe('4');
+    expect(preview().dataset.brightness).toBe('1');
+    expect(preview().style.getPropertyValue('--preview-color')).toBe('#ffffff');
     await cleanup();
   });
 });
@@ -191,6 +251,8 @@ describe('tab Remap', () => {
     await act(async () => { esc.click(); });
     expect(el.querySelector('aside')!.textContent).toContain('Sekarang');
     expect(el.querySelectorAll('.kc[data-selected="true"]').length).toBe(1);
+    expect(el.querySelector('[data-remap-layout]')?.getAttribute('data-remap-layout'))
+      .toBe('stacked');
     await cleanup();
   });
 
@@ -323,12 +385,15 @@ describe('pengaman menimpa konfigurasi tak terlihat', () => {
 
     await clickButton(el, 'Lanjutkan, saya mulai dari nol');
     expect(el.querySelector('[role="alertdialog"]')).toBeNull();
-    // Mode kering aktif secara bawaan: paket tetap dibentuk dan ditampilkan
-    // sebagai pratinjau meski tidak sungguh ditulis ke perangkat.
-    expect(el.textContent).toContain('Paket terakhir');
+    // Detail paket tidak mengotori panel kerja; seluruh transaksi tersedia
+    // pada tab Log sebagai satu sumber pemeriksaan teknis.
+    expect(el.textContent).not.toContain('Paket terakhir');
+    await clickTab('Log');
+    expect(el.textContent).toContain('Terapkan layer utama');
 
     // Provenance sudah 'edited' — permintaan kedua tidak boleh menampilkan
     // modal lagi.
+    await clickTab('Remap');
     await clickButton(el, 'Terapkan layer ini');
     expect(el.querySelector('[role="alertdialog"]')).toBeNull();
     await cleanup();

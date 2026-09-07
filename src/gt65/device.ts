@@ -37,6 +37,31 @@ function looksLikeDongle(devices: HIDDevice[]): boolean {
     (d.collections ?? []).some((c) => c.usagePage === 0xffb5));
 }
 
+async function openConfigDevice(dev: HIDDevice): Promise<HIDDevice> {
+  if (!dev.opened) {
+    try {
+      await dev.open();
+    } catch {
+      throw new DeviceError(
+        'Tidak bisa membuka perangkat. Di Linux, pasang udev rule: ' +
+        'KERNEL=="hidraw*", ATTRS{idVendor}=="05ac", ATTRS{idProduct}=="024f", ' +
+        'TAG+="uaccess" — lalu colok ulang keyboard.',
+        'permission');
+    }
+  }
+  return dev;
+}
+
+/** Buka kembali keyboard yang izinnya sudah disimpan browser, tanpa dialog. */
+export async function restoreAuthorizedDevice(): Promise<HIDDevice | null> {
+  if (!('hid' in navigator)) return null;
+  const authorized = await navigator.hid.getDevices();
+  const matching = authorized.filter((d) =>
+    d.vendorId === VENDOR_ID && d.productId === PRODUCT_ID);
+  const dev = findConfigInterface(matching);
+  return dev ? openConfigDevice(dev) : null;
+}
+
 export async function requestDevice(): Promise<HIDDevice> {
   if (!('hid' in navigator)) {
     throw new DeviceError(
@@ -64,18 +89,7 @@ export async function requestDevice(): Promise<HIDDevice> {
       'Kanal konfigurasi tidak ditemukan pada perangkat ini.', 'notfound');
   }
 
-  if (!dev.opened) {
-    try {
-      await dev.open();
-    } catch (e) {
-      throw new DeviceError(
-        'Tidak bisa membuka perangkat. Di Linux, pasang udev rule: ' +
-        'KERNEL=="hidraw*", ATTRS{idVendor}=="05ac", ATTRS{idProduct}=="024f", ' +
-        'TAG+="uaccess" — lalu colok ulang keyboard.',
-        'permission');
-    }
-  }
-  return dev;
+  return openConfigDevice(dev);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

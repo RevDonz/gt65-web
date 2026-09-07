@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { Profile } from '../../store/profile';
 
 /**
@@ -45,6 +46,48 @@ const DIRECTION_OPTIONS: { value: number; label: string }[] = [
   { value: 3, label: '3 · Kiri ke kanan' },
 ];
 
+const PREVIEW_KEYS = Array.from({ length: 24 }, (_, i) => {
+  const row = Math.floor(i / 8);
+  const col = i % 8;
+  return { i, row, col, distance: Math.abs(row - 1) + Math.abs(col - 3.5) };
+});
+
+function LightingPreview({ mode, color, speed, brightness, direction }: {
+  mode: number; color: string; speed: number; brightness: number; direction: number;
+}) {
+  const duration = Math.max(0.65, 2.45 - speed * 0.42);
+  const intensity = Math.max(0.12, Math.min(1, 0.2 + brightness * 0.2));
+  const style = {
+    '--preview-color': color,
+    '--preview-duration': `${duration}s`,
+    '--preview-brightness': intensity,
+  } as CSSProperties;
+
+  return (
+    <figure className="lighting-preview" data-lighting-preview
+            data-mode={mode} data-speed={speed} data-brightness={brightness}
+            data-direction={direction} style={style}>
+      <figcaption>
+        <span>
+          <span className="label">Pratinjau efek</span>
+          <strong>{LIGHT_MODES[mode] ?? `Mode ${mode}`}</strong>
+        </span>
+        <span className="preview-readout num">
+          {duration.toFixed(2)}s · {Math.round(intensity * 100)}%
+        </span>
+      </figcaption>
+      <div className="preview-board" aria-label={`Ilustrasi animasi ${LIGHT_MODES[mode] ?? mode}`}>
+        {PREVIEW_KEYS.map(({ i, row, col, distance }) => (
+          <span key={i} className="preview-key" aria-hidden="true"
+                style={{ '--i': i, '--row': row, '--col': col,
+                         '--distance': distance } as CSSProperties} />
+        ))}
+      </div>
+      <p>Ilustrasi konseptual—ritme mengikuti pengaturan; LED fisik dapat sedikit berbeda.</p>
+    </figure>
+  );
+}
+
 export function LightingPanel({ profile, onChange, onApply, onApplyVendorReference }: {
   profile: Profile;
   onChange: (p: Profile) => void;
@@ -59,8 +102,10 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
     v.toString(16).padStart(2, '0')).join('')}`;
 
   return (
-    <section className="panel flex max-w-xl flex-col gap-4 p-4">
+    <section className="panel settings-card flex max-w-3xl flex-col gap-4 p-5">
       <div className="label">Pencahayaan</div>
+      <LightingPreview mode={l.mode} color={hex} speed={l.speed}
+                       brightness={l.brightness} direction={l.direction} />
       <label className="flex items-center justify-between gap-4">
         <span className="label">Mode</span>
         <select value={String(l.mode)}

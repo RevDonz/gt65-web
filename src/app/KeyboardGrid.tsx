@@ -123,7 +123,7 @@ export function KeyboardGrid({
   const interactive = onSelect !== undefined;
 
   return (
-    <div ref={ref} className="kb-stage relative w-full max-w-[1100px]"
+    <div ref={ref} className="kb-stage relative w-full"
          data-reveal={reveal ? 'on' : 'off'}
          style={{ aspectRatio: `${LAYOUT_SIZE.width} / ${LAYOUT_SIZE.height}` }}>
       <div className="absolute left-0 top-0"

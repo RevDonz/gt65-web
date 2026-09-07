@@ -3,3 +3,7 @@ dist/
 logs/
 .DS_Store
 *.local
+dist-electron/
+release/
+.fonttest/
+AGENTS.md
