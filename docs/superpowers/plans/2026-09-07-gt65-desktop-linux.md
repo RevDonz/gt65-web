@@ -133,20 +133,31 @@ aplikasi terpasang di `/opt/gt65-web`, bukan `/opt/GT65 Configurator`.
 
 - [ ] **Step 1: Tambahkan metadata dan skrip**
 
-Tambahkan field berikut ke `package.json` (pertahankan yang sudah ada):
+**Ini penambahan, bukan penggantian.** `package.json` yang ada memuat 5 skrip dan 12
+devDependencies (vite, typescript, tailwind, vitest, dan lainnya). Menimpanya dengan
+blok di bawah akan merusak repo. Sisipkan field yang belum ada, biarkan sisanya utuh:
 
 ```json
-{
-  "name": "gt65-web",
-  "version": "0.1.0",
-  "description": "Konfigurator desktop VortexSeries GT65 lewat WebHID",
-  "homepage": "https://github.com/RevDonz/gt65-web",
-  "author": "Reva Doni Aprilio <ai@lintas.net.id>",
-  "license": "MIT",
-  "main": "dist-electron/main.cjs",
-  "private": true,
-  "type": "module"
-}
+"version": "0.1.0",
+"description": "Konfigurator desktop VortexSeries GT65 lewat WebHID",
+"homepage": "https://github.com/RevDonz/gt65-web",
+"author": "Reva Doni Aprilio <ai@lintas.net.id>",
+"license": "MIT",
+"main": "dist-electron/main.cjs"
+```
+
+Verifikasi tidak ada yang hilang setelah menyunting:
+
+```bash
+node -e "
+const p = require('./package.json');
+const wajib = ['dev','build','preview','test','test:watch'];
+const hilang = wajib.filter(k => !(k in p.scripts));
+if (hilang.length) { console.error('SKRIP HILANG:', hilang); process.exit(1); }
+if (!p.version || !p.main) { console.error('version atau main belum diisi'); process.exit(1); }
+console.log('package.json utuh:', Object.keys(p.scripts).length, 'skrip,',
+            Object.keys(p.devDependencies).length, 'devDependencies');
+"
 ```
 
 Tambahkan ke `scripts`:
@@ -1628,7 +1639,15 @@ Ruby tidak perlu dipasang.
 
 - [ ] **Step 3: Bangun semua paket**
 
+**Jalankan dari akar proyek.** `deb.afterInstall` di-resolve lewat
+`path.resolve(projectDir, …)`, tetapi entri `deb.fpm` diteruskan **verbatim** ke fpm
+yang dipanggil tanpa opsi `cwd` (`FpmTarget.js:280`). Direktori kerja yang salah
+menghasilkan paket yang isinya salah — dan `electron-builder` tetap keluar dengan
+status 0. Itulah sebabnya Step 4 memverifikasi isi paket, bukan hanya keberhasilan
+build.
+
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 npm run build && npm run build:electron
 npx electron-builder --linux --publish never 2>&1 | tail -30
 ls -la release/
