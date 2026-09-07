@@ -42,19 +42,30 @@ Unduh dari [halaman Rilis](https://github.com/RevDonz/gt65-web/releases).
 | Arch, Void, Gentoo, NixOS, immutable | `.AppImage` | manual |
 
 ```bash
-# Debian dan turunannya
-sudo dpkg -i gt65-configurator_0.1.0_amd64.deb
+# Debian dan turunannya — apt menyelesaikan dependensi, dpkg -i tidak
+sudo apt install ./gt65-configurator_0.1.0_amd64.deb
 
 # Fedora dan turunannya
-sudo rpm -i gt65-configurator-0.1.0.x86_64.rpm
+sudo dnf install ./gt65-configurator-0.1.0.x86_64.rpm
 
 # AppImage
 chmod +x gt65-configurator-0.1.0-x86_64.AppImage
 ./gt65-configurator-0.1.0-x86_64.AppImage
 ```
 
+Pakai `apt`/`dnf`, bukan `dpkg -i`/`rpm -i` polos: paket mendeklarasikan 15
+dependensi, dan kalau ada yang kurang di sistem Anda, `dpkg -i`/`rpm -i`
+meninggalkan paket **tidak terkonfigurasi** — skrip `postinst` yang menjalankan
+`udevadm control --reload-rules` dan `udevadm trigger` (janji "tanpa
+cabut-colok" di bawah) tidak pernah berjalan sama sekali.
+
 Pengguna AppImage harus memasang aturan udev sendiri. Aplikasi akan
-memberitahu bila belum terpasang, dan berkasnya ada di dalam bundel:
+memberitahu bila belum terpasang, lengkap dengan lintasan absolut berkasnya di
+dalam bundel yang sedang berjalan (mis. `/tmp/.mount_gt65XXXXXX/resources/70-gt65.rules`
+— lintasan ini acak per peluncuran, jadi salin perintah dari spanduknya, jangan
+memakai nama berkas telanjang). `70-gt65.rules` juga dirilis sebagai aset lepas
+di [halaman Rilis](https://github.com/RevDonz/gt65-web/releases), berguna kalau
+Anda ingin memasangnya sebelum membuka AppImage untuk pertama kali:
 
 ```bash
 sudo install -m644 70-gt65.rules /etc/udev/rules.d/70-gt65.rules
