@@ -1,0 +1,88 @@
+name: Rilis
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # rpmbuild wajib untuk target rpm. fpm diunduh electron-builder sendiri,
+      # jadi Ruby tidak perlu dipasang.
+      - name: Prasyarat sistem
+        run: sudo apt-get update && sudo apt-get install -y rpm xz-utils
+
+      - name: Cache unduhan Electron
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
+      - run: npm ci
+
+      # Golden test byte adalah mekanisme kebenaran utama proyek ini karena
+      # galat protokol gagal senyap. Membangun paket dari kode yang tidak lulus
+      # test berarti mendistribusikan sesuatu yang mungkin mengirim byte salah
+      # ke hardware yang tidak bisa dibaca balik.
+      - run: npm test
+
+      - run: npm run build
+      - run: npm run build:electron
+
+      # fpm menyalin mode berkas sumber apa adanya; git tidak menyimpan mode
+      # selain bit eksekusi, jadi mode ditetapkan ulang di sini.
+      - name: Tetapkan mode berkas paket
+        run: |
+          chmod 0644 build/70-gt65.rules
+          chmod 0755 build/linux-after-install.sh build/linux-after-remove.sh
+
+      # PENTING: JANGAN tambahkan nama target di CLI (mis. "--linux deb
+      # AppImage"). Memanggil electron-builder dengan nama target di CLI
+      # tidak mewarisi array `arch` per-target dari electron-builder.yml —
+      # hasilnya cuma x64. Dibuktikan lokal: "--linux --publish never" polos
+      # (tanpa nama target) menghasilkan AppImage x64+arm64 dan deb x64+arm64
+      # dari konfigurasi YAML, sesuai yang diharapkan.
+      - run: npx electron-builder --linux --publish never
+
+      - name: Verifikasi isi paket
+        run: |
+          set -euo pipefail
+          dpkg-deb -c release/gt65-configurator_*_amd64.deb | grep -q 'usr/lib/udev/rules.d/70-gt65.rules'
+          dpkg-deb -f release/gt65-configurator_*_amd64.deb Depends | grep -q 'libasound2 (>= 1.0.16)'
+          dpkg-deb -c release/gt65-configurator_*_amd64.deb | grep -q 'usr/share/metainfo/'
+          rpm -qlp release/gt65-configurator-*.x86_64.rpm | grep -q '70-gt65.rules'
+          echo "Isi paket terverifikasi."
+
+      - name: Hitung checksum
+        working-directory: release
+        run: |
+          cp ../build/70-gt65.rules .
+          sha256sum *.AppImage *.deb *.rpm 70-gt65.rules > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Terbitkan rilis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --prerelease \
+            --notes-file .github/RELEASE_NOTES.md \
+            release/*.AppImage release/*.deb release/*.rpm \
+            release/70-gt65.rules release/SHA256SUMS.txt
