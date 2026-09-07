@@ -1,0 +1,95 @@
+appId: id.lintas.gt65configurator
+productName: GT65 Configurator
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+
+# Aturan udev ikut ke dalam bundel supaya pengguna AppImage punya berkas yang
+# bisa dipasang manual — mereka tidak punya langkah instalasi yang bisa
+# memasangnya otomatis.
+extraResources:
+  - from: build/70-gt65.rules
+    to: 70-gt65.rules
+
+npmRebuild: false
+publish: null
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+    - target: rpm
+      arch: [x64]
+  executableName: gt65-configurator
+  synopsis: Konfigurator keyboard VortexSeries GT65
+  description: >-
+    Konfigurator desktop untuk keyboard mekanik VortexSeries GT65 (05AC:024F).
+    Pemetaan ulang tombol, pencahayaan RGB, tester tombol, dan pengaturan
+    perangkat lewat WebHID. Tanpa telemetri, tanpa proses residen.
+  category: Utility
+  maintainer: Reva Doni Aprilio <ai@lintas.net.id>
+  vendor: Reva Doni Aprilio
+  desktop:
+    entry:
+      Keywords: keyboard;hid;rgb;gt65;vortex;konfigurator;
+      StartupNotify: "true"
+      StartupWMClass: GT65 Configurator
+
+deb:
+  packageName: gt65-configurator
+  packageCategory: utils
+  priority: optional
+  compression: xz
+  # Tanpa ini nama berkasnya "GT65 Configurator_0.1.0_amd64.deb" — berspasi.
+  artifactName: gt65-configurator_${version}_${arch}.${ext}
+  afterInstall: build/linux-after-install.sh
+  afterRemove: build/linux-after-remove.sh
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libgbm1
+    - libudev1
+    - libdrm2
+    - libxkbcommon0
+    # WAJIB berversi. "libasound2" telanjang tidak bisa di-resolve di Ubuntu
+    # 24.04 bersih: ia virtual dengan DUA penyedia, dan apt menolak memilih
+    # lalu memasang NOL paket. Debian Policy 7.5: Provides tanpa versi tidak
+    # memenuhi dependensi berversi, jadi bentuk berversi menyisakan
+    # libasound2t64 sebagai satu-satunya penyedia.
+    - libasound2 (>= 1.0.16)
+    - libcups2
+  # Array kosong itu truthy di JS, jadi cabang customRecommends diambil dan
+  # libappindicator3-1 bawaan (tanpa kandidat di 24.04) tidak ikut.
+  recommends: []
+  fpm:
+    - build/70-gt65.rules=/usr/lib/udev/rules.d/70-gt65.rules
+    - build/id.lintas.gt65configurator.metainfo.xml=/usr/share/metainfo/id.lintas.gt65configurator.metainfo.xml
+
+rpm:
+  packageName: gt65-configurator
+  compression: xz
+  artifactName: gt65-configurator-${version}.${arch}.${ext}
+  afterInstall: build/linux-after-install.sh
+  afterRemove: build/linux-after-remove.sh
+  # Opsi fpm TIDAK diwariskan dari blok linux: LinuxConfiguration punya
+  # additionalProperties:false dan tidak punya properti fpm. Harus diulang.
+  fpm:
+    - build/70-gt65.rules=/usr/lib/udev/rules.d/70-gt65.rules
+    - build/id.lintas.gt65configurator.metainfo.xml=/usr/share/metainfo/id.lintas.gt65configurator.metainfo.xml
+
+appImage:
+  artifactName: gt65-configurator-${version}-${arch}.${ext}
