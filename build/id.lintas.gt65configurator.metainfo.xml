@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>id.lintas.gt65configurator</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>GT65 Configurator</name>
+  <summary>Konfigurator keyboard VortexSeries GT65</summary>
+  <summary xml:lang="en">Configurator for the VortexSeries GT65 keyboard</summary>
+
+  <description>
+    <p>
+      Konfigurator desktop untuk keyboard mekanik VortexSeries GT65. Protokolnya
+      hasil rekayasa balik dari driver Windows vendor, sehingga keyboard ini bisa
+      diatur dari Linux tanpa Windows.
+    </p>
+    <p>Yang bisa diatur:</p>
+    <ul>
+      <li>Pemetaan ulang tombol pada layer utama dan layer Fn</li>
+      <li>Pencahayaan RGB: mode, warna, kecepatan, kecerahan, arah</li>
+      <li>Pengaturan perangkat dan timeout lampu tidur</li>
+      <li>Tester tombol dan log transaksi yang bisa diekspor</li>
+    </ul>
+    <p>
+      Keyboard harus tersambung lewat kabel USB. Mode kering menyala secara bawaan:
+      aplikasi menampilkan paket yang akan dikirim sebelum benar-benar mengirimnya.
+      Tanpa telemetri dan tanpa proses residen.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">gt65-configurator.desktop</launchable>
+  <url type="homepage">https://github.com/RevDonz/gt65-web</url>
+  <url type="bugtracker">https://github.com/RevDonz/gt65-web/issues</url>
+
+  <provides>
+    <binary>gt65-configurator</binary>
+  </provides>
+
+  <categories>
+    <category>Utility</category>
+    <category>Settings</category>
+  </categories>
+
+  <keywords>
+    <keyword>keyboard</keyword>
+    <keyword>hid</keyword>
+    <keyword>rgb</keyword>
+    <keyword>gt65</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-09-07">
+      <description>
+        <p>Rilis pertama sebagai aplikasi desktop Linux.</p>
+      </description>
+    </release>
+  </releases>
+</component>

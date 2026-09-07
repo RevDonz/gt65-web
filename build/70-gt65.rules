@@ -1,0 +1,4 @@
+# VortexSeries GT65 (05AC:024F) - beri akses hidraw ke pengguna sesi lokal.
+# Catatan: GT65 memakai Vendor ID milik Apple (05ac), jadi aturan ini juga
+# mengenai keyboard Apple asli.
+KERNEL=="hidraw*", ATTRS{idVendor}=="05ac", ATTRS{idProduct}=="024f", TAG+="uaccess"
