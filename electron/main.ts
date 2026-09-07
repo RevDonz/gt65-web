@@ -333,9 +333,19 @@ function createWindow(): void {
    * jendela hantu itu lalu keluar. Tidak boleh ada keadaan "proses hidup,
    * jendela tak terlihat, pengguna tidak diberi tahu": catat ke stderr DAN
    * paksa jendela terlihat dengan pesan galat yang jelas.
+   *
+   * R-N1: electron.d.ts mendokumentasikan loadURL() sebagai "rejects if the
+   * page fails to load (see did-fail-load)" — jadi satu kegagalan muat
+   * menyalakan BAIK 'did-fail-load' MAUPUN .catch() di bawah. Tanpa penanda
+   * ini, pengguna melihat dua dialog modal berurutan untuk satu galat yang
+   * sama, dan pesan .catch() ("melempar sebelum halaman mulai dimuat") keliru
+   * untuk kasus itu. `sudahLapor` memastikan hanya satu dialog tampil, dengan
+   * pesan yang sesuai jalur yang benar-benar menyalakannya duluan.
    */
+  let sudahLapor = false;
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (!isMainFrame) return;
+    if (!isMainFrame || sudahLapor) return;
+    sudahLapor = true;
     console.error(
       `[gt65] Gagal memuat jendela (${errorCode} ${errorDescription}): ${validatedURL}`,
     );
@@ -351,6 +361,8 @@ function createWindow(): void {
   });
 
   win.loadURL(IS_DEV ? DEV_SERVER_URL : `${APP_ORIGIN}/index.html`).catch((err: unknown) => {
+    if (sudahLapor) return; // did-fail-load sudah melapor untuk kegagalan yang sama
+    sudahLapor = true;
     console.error('[gt65] win.loadURL melempar:', err);
     win.show();
     dialog.showErrorBox(
