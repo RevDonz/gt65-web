@@ -938,7 +938,17 @@ function installHidHandlers(ses: Electron.Session): void {
     // Satu deviceId = satu perangkat fisik; Electron memberi izin untuk SEMUA
     // interface perangkat itu sekaligus. Pemilihan interface konfigurasi tetap
     // tugas findConfigInterface() di renderer.
-    const match = details.deviceList.find(isGt65);
+    //
+    // Dongle 2.4 GHz memakai VID/PID yang SAMA dengan mode kabel, jadi ketika
+    // keduanya tercolok deviceList memuat dua perangkat fisik yang cocok.
+    // Yang punya kanal konfigurasi hanya mode kabel (G4). Kita tidak bisa
+    // memastikannya lewat collections — isinya di proses main tidak andal —
+    // jadi dongle disingkirkan lewat nama produknya, dan kalau ternyata tidak
+    // ada yang tersisa kita jatuh kembali ke kandidat mana pun supaya renderer
+    // yang memberi pesan 'wrongmode' yang benar.
+    const cocok = details.deviceList.filter(isGt65);
+    const berkabel = cocok.filter((d) => !/dongle/i.test(d.name));
+    const match = berkabel[0] ?? cocok[0];
     if (match !== undefined) { callback(match.deviceId); return; }
 
     // Tahan sebentar supaya pengguna yang mencolok keyboard setelah menekan
@@ -1096,6 +1106,10 @@ Yang harus dipastikan sendiri di jendela yang terbuka:
 4. Berpindah ke keenam tab; izin tidak diminta ulang.
 5. Tombol "Salin log" di tab Log berhasil menyalin.
 6. Tidak ada pelanggaran CSP di konsol.
+7. **Dengan dongle DAN kabel sama-sama tercolok**, aplikasi menemukan kanal
+   konfigurasi — bukan pesan "Keyboard tersambung lewat dongle 2.4 GHz".
+   Keluaran `GT65_DUMP_HID=1` akan menunjukkan dua perangkat fisik yang cocok;
+   yang dipilih harus yang namanya bukan `USB Dongle`.
 
 **Kalau nomor 2 gagal, berhenti.** Itu berarti skema protokolnya tidak jalan, dan
 semua yang lain tidak ada gunanya.
