@@ -18,12 +18,21 @@
  *     adalah tugas findConfigInterface() di renderer.
  */
 
-import { app, BrowserWindow, Menu, net, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, Menu, dialog, net, protocol, session, shell } from 'electron';
 import { promises as fs, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HOST, SCHEME, resolveAssetPath } from './lib/resolvePath';
 import { gt65HidrawStatus } from './lib/hidAccess';
+
+// M1: app.getName() (dan karenanya WM_CLASS Electron di Linux) berasal dari
+// `name` di package.json DI DALAM app.asar ("gt65-web"), bukan dari
+// `productName` electron-builder. Tanpa ini, jendela sungguhan memakai
+// WM_CLASS "gt65-web" sementara .desktop terpasang bernama
+// "gt65-configurator.desktop" dan StartupWMClass menunjuk nama lain lagi —
+// ikon dock/taskbar lepas dari jendelanya. Harus dipanggil sebelum jendela
+// dibuat; electron-builder.yml diselaraskan ke nilai yang sama.
+app.setName('gt65-configurator');
 
 const APP_ORIGIN = `${SCHEME}://${HOST}`;
 const VENDOR_ID = 0x05ac;
@@ -94,10 +103,29 @@ function plain(body: string, status: number): Response {
   });
 }
 
+/**
+ * C1: lintasan absolut 70-gt65.rules di dalam bundel terpaket, atau `null`
+ * bila tak ditemukan. Sumbernya `process.resourcesPath` — pada AppImage itu
+ * lintasan mount sekali-pakai (`/tmp/.mount_gt65XXXXXX/resources/...`), jadi
+ * HARUS dibaca saat runtime, bukan dihardcode. Di mode dev `resourcesPath`
+ * menunjuk ke dalam node_modules/electron/dist di mana berkas ini tidak ada;
+ * fs.access memverifikasi keberadaannya sebelum dilaporkan ke renderer —
+ * jangan pernah mengarang lintasan yang belum diverifikasi ada.
+ */
+async function udevRulesPath(): Promise<string | null> {
+  const p = path.join(process.resourcesPath, '70-gt65.rules');
+  try {
+    await fs.access(p);
+    return p;
+  } catch {
+    return null;
+  }
+}
+
 /** Endpoint diagnostik: dipakai renderer untuk memperingatkan soal udev. */
 async function serveHidAccess(): Promise<Response> {
-  const status = await gt65HidrawStatus();
-  return new Response(JSON.stringify(status), {
+  const [status, rulesPath] = await Promise.all([gt65HidrawStatus(), udevRulesPath()]);
+  return new Response(JSON.stringify({ ...status, rulesPath }), {
     status: 200,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
@@ -108,7 +136,16 @@ async function serveFromDist(request: Request): Promise<Response> {
     return plain('Method Not Allowed', 405);
   }
 
-  if (new URL(request.url).pathname === '/__gt65/hid-access') return serveHidAccess();
+  // Ledger #5: satu-satunya new URL() di berkas ini yang sebelumnya tak
+  // dijaga try/catch. Kalau melempar (URL request.url rusak), protocol.handle
+  // menolaknya dan pengguna mendapat halaman galat Chromium tanpa penjelasan.
+  let pathname: string;
+  try {
+    pathname = new URL(request.url).pathname;
+  } catch {
+    return plain('Not Found', 404);
+  }
+  if (pathname === '/__gt65/hid-access') return serveHidAccess();
 
   const filePath = resolveAssetPath(request.url, DIST_ROOT);
   if (filePath === null) return plain('Forbidden', 403);
@@ -129,7 +166,11 @@ async function serveFromDist(request: Request): Promise<Response> {
   let upstream: Response;
   try {
     upstream = await net.fetch(pathToFileURL(real).toString());
-  } catch {
+  } catch (e) {
+    // Ledger #6: net.fetch menyeragamkan EIO/EACCES/dst. jadi 404 senyap.
+    // Blast radius nol di sini (berkas sudah lolos stat di atas), tapi ini
+    // anti-pola yang sedang diburu proyek ini — dicatat, bukan ditelan.
+    console.error(`[gt65] net.fetch gagal untuk ${real}:`, e);
     return plain('Not Found', 404);
   }
   if (!upstream.ok) return plain('Not Found', 404);
@@ -280,7 +321,40 @@ function createWindow(): void {
     },
   });
   win.once('ready-to-show', () => win.show());
-  void win.loadURL(IS_DEV ? DEV_SERVER_URL : `${APP_ORIGIN}/index.html`);
+
+  /**
+   * I3: tanpa ini, kegagalan memuat berarti 'ready-to-show' tidak pernah
+   * menyala — proses hidup dengan jendela tak terlihat, dan karena
+   * requestSingleInstanceLock() peluncuran berikutnya cuma memfokuskan
+   * jendela hantu itu lalu keluar. Tidak boleh ada keadaan "proses hidup,
+   * jendela tak terlihat, pengguna tidak diberi tahu": catat ke stderr DAN
+   * paksa jendela terlihat dengan pesan galat yang jelas.
+   */
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    console.error(
+      `[gt65] Gagal memuat jendela (${errorCode} ${errorDescription}): ${validatedURL}`,
+    );
+    win.show();
+    dialog.showErrorBox(
+      'GT65 Configurator gagal dimuat',
+      `Antarmuka aplikasi gagal dimuat.\n\n`
+      + `Galat: ${errorDescription || 'tidak diketahui'} (${errorCode})\n`
+      + `Lintasan: ${validatedURL}\n\n`
+      + 'Coba tutup dan jalankan ulang aplikasi. Bila terus terjadi, laporkan '
+      + 'galat ini di repositori proyek (menu Bantuan → Repositori proyek).',
+    );
+  });
+
+  win.loadURL(IS_DEV ? DEV_SERVER_URL : `${APP_ORIGIN}/index.html`).catch((err: unknown) => {
+    console.error('[gt65] win.loadURL melempar:', err);
+    win.show();
+    dialog.showErrorBox(
+      'GT65 Configurator gagal dimuat',
+      `Pemanggilan loadURL melempar galat sebelum halaman mulai dimuat:\n\n${String(err)}\n\n`
+      + 'Coba tutup dan jalankan ulang aplikasi.',
+    );
+  });
 }
 
 function buildMenu(): void {

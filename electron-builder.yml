@@ -40,7 +40,13 @@ linux:
     entry:
       Keywords: keyboard;hid;rgb;gt65;vortex;konfigurator;
       StartupNotify: "true"
-      StartupWMClass: GT65 Configurator
+      # M1: harus sama persis dengan app.setName('gt65-configurator') di
+      # electron/main.ts — itulah nilai WM_CLASS sungguhan jendela Electron
+      # (app.getName() menentukannya, bukan productName di sini). Sebelumnya
+      # "GT65 Configurator" tidak cocok dengan WM_CLASS ATAUPUN nama berkas
+      # .desktop terpasang (gt65-configurator.desktop), jadi ikon dock lepas
+      # dari jendelanya di kedua jalur pencocokan.
+      StartupWMClass: gt65-configurator
 
 deb:
   packageName: gt65-configurator
