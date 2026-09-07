@@ -25,14 +25,18 @@ import { pathToFileURL } from 'node:url';
 import { HOST, SCHEME, resolveAssetPath } from './lib/resolvePath';
 import { gt65HidrawStatus } from './lib/hidAccess';
 
-// M1: app.getName() (dan karenanya WM_CLASS Electron di Linux) berasal dari
-// `name` di package.json DI DALAM app.asar ("gt65-web"), bukan dari
-// `productName` electron-builder. Tanpa ini, jendela sungguhan memakai
-// WM_CLASS "gt65-web" sementara .desktop terpasang bernama
-// "gt65-configurator.desktop" dan StartupWMClass menunjuk nama lain lagi —
-// ikon dock/taskbar lepas dari jendelanya. Harus dipanggil sebelum jendela
-// dibuat; electron-builder.yml diselaraskan ke nilai yang sama.
-app.setName('gt65-configurator');
+// R-M1: WM_CLASS Electron di Linux (native_window_views.cc) dibaca dari env
+// CHROME_DESKTOP — diisi oleh lib/browser/init.ts milik Electron SENDIRI,
+// sebelum skrip main aplikasi ini sempat berjalan. app.setName() di sini
+// karenanya tidak pernah berpengaruh pada WM_CLASS; ia hanya mengubah
+// app.getName(), yang menentukan direktori userData default (appData + nama
+// aplikasi) — tempat localStorage renderer, satu-satunya salinan profil
+// pengguna, disimpan. Memanggilnya berisiko memindahkan direktori itu tanpa
+// membeli kecocokan WM_CLASS apa pun. Kecocokan yang sebenarnya datang dari
+// `desktopName` + `syncDesktopName: true` di electron-builder.yml, yang
+// membuat Electron mengisi CHROME_DESKTOP dengan nama .desktop yang benar
+// sebelum modul ini bahkan dimuat. Lihat package.json ("desktopName") dan
+// electron-builder.yml (blok linux).
 
 const APP_ORIGIN = `${SCHEME}://${HOST}`;
 const VENDOR_ID = 0x05ac;

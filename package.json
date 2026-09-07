@@ -5,6 +5,7 @@
   "homepage": "https://github.com/RevDonz/gt65-web",
   "author": "Reva Doni Aprilio <ai@lintas.net.id>",
   "license": "MIT",
+  "desktopName": "gt65-configurator.desktop",
   "main": "dist-electron/main.cjs",
   "private": true,
   "type": "module",

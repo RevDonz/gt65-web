@@ -28,6 +28,15 @@ linux:
     - target: rpm
       arch: [x64]
   executableName: gt65-configurator
+  # R-M1: WM_CLASS jendela Electron sungguhan berasal dari CHROME_DESKTOP, yang
+  # diisi Electron sendiri (lib/browser/init.ts) dari `desktopName` di
+  # package.json — SEBELUM skrip main aplikasi sempat berjalan. app.setName()
+  # tidak berpengaruh sama sekali di sini dan sudah dibuang dari main.ts.
+  # syncDesktopName membuat electron-builder menamai .desktop terpasang dari
+  # `desktopName` juga (minus akhiran .desktop), sehingga app_id runtime, nama
+  # berkas .desktop, dan StartupWMClass di bawah semuanya "gt65-configurator" —
+  # tidak ada lagi jalur pencocokan yang meleset.
+  syncDesktopName: true
   synopsis: Konfigurator keyboard VortexSeries GT65
   description: >-
     Konfigurator desktop untuk keyboard mekanik VortexSeries GT65 (05AC:024F).
@@ -40,12 +49,9 @@ linux:
     entry:
       Keywords: keyboard;hid;rgb;gt65;vortex;konfigurator;
       StartupNotify: "true"
-      # M1: harus sama persis dengan app.setName('gt65-configurator') di
-      # electron/main.ts — itulah nilai WM_CLASS sungguhan jendela Electron
-      # (app.getName() menentukannya, bukan productName di sini). Sebelumnya
-      # "GT65 Configurator" tidak cocok dengan WM_CLASS ATAUPUN nama berkas
-      # .desktop terpasang (gt65-configurator.desktop), jadi ikon dock lepas
-      # dari jendelanya di kedua jalur pencocokan.
+      # Harus sama persis dengan basis `desktopName` di package.json
+      # ("gt65-configurator.desktop" minus akhiran) — itulah app_id yang
+      # dibaca Electron dari CHROME_DESKTOP saat runtime.
       StartupWMClass: gt65-configurator
 
 deb:
