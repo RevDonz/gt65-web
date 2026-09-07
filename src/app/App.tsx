@@ -255,7 +255,7 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
                  actions={profileActions}
                  neverBackedUp={!profile.backedUp} onBackup={handleExport} />
 
-      <HidAccessBanner />
+      <HidAccessBanner deviceStatus={dev.status} />
 
       {pendingRemapLayer !== null && (
         <OverwriteGuardModal
