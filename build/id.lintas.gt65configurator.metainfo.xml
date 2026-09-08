@@ -18,7 +18,9 @@
     <ul>
       <li>Pemetaan ulang tombol pada layer utama dan layer Fn</li>
       <li>Pencahayaan RGB: mode, warna, kecepatan, kecerahan, arah</li>
-      <li>Pengaturan perangkat dan timeout lampu tidur</li>
+      <li>Pustaka profil dan editor RGB per tombol</li>
+      <li>Editor dan perekam makro lokal, belum mendukung upload perangkat</li>
+      <li>Mode game, pengaturan Fn, dan timeout lampu tidur</li>
       <li>Tester tombol dan log transaksi yang bisa diekspor</li>
     </ul>
     <p>
@@ -51,6 +53,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.2.0" date="2026-09-08" type="development">
+      <description>
+        <p>UI Keyboard Studio baru, pustaka profil, editor RGB per tombol dan makro lokal, serta pengaturan game dan Fn.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-09-07">
       <description>
         <p>Rilis pertama sebagai aplikasi desktop Linux.</p>

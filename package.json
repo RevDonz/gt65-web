@@ -1,6 +1,6 @@
 {
   "name": "gt65-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Konfigurator desktop VortexSeries GT65 lewat WebHID",
   "homepage": "https://github.com/RevDonz/gt65-web",
   "author": "Reva Doni Aprilio <ai@lintas.net.id>",

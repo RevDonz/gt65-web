@@ -1,6 +1,6 @@
 # GT65 Configurator
 
-Konfigurator berbasis browser untuk keyboard VortexSeries GT65, sebagai
+Konfigurator desktop Linux dan web untuk keyboard VortexSeries GT65, sebagai
 pengganti software vendor yang hanya tersedia di Windows.
 
 Protokolnya hasil rekayasa balik dari `DeviceDriver.exe` lewat disassembly.
@@ -10,10 +10,20 @@ verifikasi terhadap binary vendor, **bukan** terhadap hardware sungguhan.
 Langkah verifikasi hardware (Task 1 pada `docs/hardware-checklist.md`) belum
 dijalankan; lihat "Yang belum diketahui" di bawah.
 
+## Fitur v0.2.0
+
+UI Keyboard Studio baru, remap dua layer, pustaka banyak profil, RGB per tombol,
+editor makro lokal, mode game, opsi Fn, fungsi sistem/browser, tester, dan log
+transaksi. **Makro belum dapat di-upload atau diikat ke tombol perangkat.**
+RGB baru mengikuti encoder vendor dan belum diverifikasi hasil fisiknya dalam
+sesi rilis. Lihat [audit semua fitur vendor](docs/vendor-feature-audit.md).
+
+Profil v1/v2 dimigrasi menjadi v3; ekspor cadangan sebelum upgrade. Aplikasi
+v0.1.0 tidak dapat membuka profil v3.
+
 ## Yang perlu diketahui sebelum memakai
 
-**Hanya Chromium.** Aplikasi memakai WebHID, yang hanya ada di Chrome, Edge,
-Brave, dan Opera. Firefox dan Safari tidak mendukungnya dan tidak akan bisa.
+**Versi desktop sudah menyertakan Chromium/Electron.** Untuk versi web, gunakan browser Chromium yang mendukung WebHID seperti Chrome, Edge, atau Brave. Firefox dan Safari tidak mendukung WebHID.
 
 **Hanya mode kabel.** Sambungkan keyboard dengan kabel USB. Lewat dongle
 2.4 GHz, keyboard menampilkan layout HID berbeda yang tidak memuat kanal
@@ -24,12 +34,14 @@ fakta yang sudah dibuktikan: perangkat *diasumsikan* hanya menerima tulisan
 dan tidak mengembalikan konfigurasinya, tapi langkah probe yang akan
 memastikannya pada hardware sungguhan belum dijalankan (lihat "Yang belum
 diketahui"). Karena itu **aplikasi ini yang menjadi sumber kebenaran**, bukan
-keyboard. Profil disimpan di browser, dan tombol Terapkan selalu menulis
-ulang seluruh konfigurasi. Pakai tombol **Ekspor profil** di bar navigasi
+keyboard. Profil disimpan lokal pada aplikasi desktop atau browser masing-masing.
+Penyimpanannya terpisah; gunakan Ekspor lalu Impor untuk memindahkan profil
+web ke desktop. Tombol Terapkan menulis bagian konfigurasi yang dipilih. Pakai tombol **Ekspor profil** di bar navigasi
 sebagai cadangan — lihat "Cadangan profil" di bawah.
 
-**Mode kering aktif secara bawaan.** Aplikasi menampilkan paket yang akan
-dikirim tanpa benar-benar mengirimnya. Matikan hanya kalau Anda siap menulis.
+**Mode kering aktif pada preferensi baru.** Aplikasi menampilkan paket yang akan
+dikirim tanpa benar-benar mengirimnya. Pilihan mode yang sudah disimpan tetap
+dipertahankan saat upgrade. Matikan hanya kalau Anda siap menulis.
 
 ## Memasang aplikasi desktop
 
@@ -41,25 +53,21 @@ Unduh dari [halaman Rilis](https://github.com/RevDonz/gt65-web/releases).
 | Fedora, RHEL, openSUSE | `.rpm` | otomatis |
 | Arch, Void, Gentoo, NixOS, immutable | `.AppImage` | manual |
 
-**Catatan verifikasi.** Pemasangan `.deb` maupun `.rpm` di bawah belum pernah
-diuji sungguhan di distro mana pun: `sudo` di mesin verifikasi minta sandi
-interaktif, jadi `apt install`/`dnf install` belum pernah benar-benar
-dijalankan di sana. Berkas `.rpm` itu sendiri belum pernah dibangun di mesin
-itu pula — `rpmbuild` tidak terpasang — sehingga `.rpm` pertama kali dibangun
-oleh CI, bukan diverifikasi secara lokal terlebih dahulu. Artefak arm64 juga
-belum pernah dibangun di mesin ini. Perilaku pemasangan di Ubuntu 24.04 dengan
-`apparmor_restrict_unprivileged_userns=1` belum diuji.
+**Catatan verifikasi.** CI membangun dan memeriksa 2 paket `.deb`, 2 AppImage,
+dan 1 `.rpm`. Instalasi nyata melalui manajer paket di semua distro, eksekusi
+ARM64 pada perangkat asli, serta pembatasan user namespaces/AppArmor di setiap
+distro belum diuji menyeluruh. Rilis tetap prerelease.
 
 ```bash
 # Debian dan turunannya — apt menyelesaikan dependensi, dpkg -i tidak
-sudo apt install ./gt65-configurator_0.1.0_amd64.deb
+sudo apt install ./gt65-configurator_0.2.0_amd64.deb
 
 # Fedora dan turunannya
-sudo dnf install ./gt65-configurator-0.1.0.x86_64.rpm
+sudo dnf install ./gt65-configurator-0.2.0.x86_64.rpm
 
 # AppImage
-chmod +x gt65-configurator-0.1.0-x86_64.AppImage
-./gt65-configurator-0.1.0-x86_64.AppImage
+chmod +x gt65-configurator-0.2.0-x86_64.AppImage
+./gt65-configurator-0.2.0-x86_64.AppImage
 ```
 
 Pakai `apt`/`dnf`, bukan `dpkg -i`/`rpm -i` polos: paket mendeklarasikan 15
@@ -96,12 +104,12 @@ dianggap final:
   persistensi aplikasi bertumpu pada asumsi ini. Halaman probe ada di
   `tools/hidprobe.html` dan langkahnya di `docs/hardware-checklist.md`, tapi
   belum dijalankan pada perangkat fisik.
-- **Nilai `mode` pencahayaan yang valid belum diketahui.** Panel Lampu memakai
-  input angka mentah untuk field mode, bukan daftar nama efek, karena
-  pemetaan nilai ke efek belum ditemukan.
-- **Arti kelima flag pengaturan belum diketahui.** Panel Pengaturan memberi
-  label sementara "Flag byte N" pada tiap kotak centang; UI ini belum final
-  dan akan diberi label sungguhan setelah pemetaannya ditemukan.
+- **Rentang pencahayaan berbeda antar versi driver.** Editor memakai efek
+  bernama pada rentang yang pernah dikalibrasi; slider baseline vendor yang
+  baru diamati memerlukan capture lanjutan sebelum rentangnya disamakan.
+- **Pemetaan flag sudah ditemukan pada encoder vendor.** Mode game, blokir
+  Alt+Tab/Alt+F4/Windows, dan perilaku Fn sekarang berlabel; perilaku tiap
+  opsi belum diuji ulang pada firmware unit ini dalam sesi rilis.
 
 ## Linux: izin perangkat
 

@@ -34,6 +34,11 @@ jobs:
           key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: electron-${{ runner.os }}-
 
+      - name: Cocokkan versi dengan tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node -e 'const v = require("./package.json").version; if (process.env.RELEASE_TAG !== "v" + v) throw new Error("Tag dan versi paket tidak cocok")'
+
       - run: npm ci
 
       # Golden test byte adalah mekanisme kebenaran utama proyek ini karena
