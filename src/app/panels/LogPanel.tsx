@@ -106,9 +106,7 @@ export function LogPanel({ entries, dryRun, productName }: {
       </div>
 
       {entries.length === 0 ? (
-        <p className="panel px-4 py-3 text-[12px] text-[var(--ink-2)]">
-          Belum ada transaksi. Klik salah satu tombol "Terapkan" di tab lain.
-        </p>
+        <div className="empty-state"><span className="empty-keycap">≡</span><strong>Aktivitas Anda muncul di sini</strong><p>Belum ada transaksi. Klik salah satu tombol "Terapkan" di tab lain untuk mencatat pratinjau atau pengiriman ke keyboard.</p><span className="pill">Riwayat sesi · Bisa disalin dan diunduh</span></div>
       ) : (
         <ul className="flex flex-col gap-2">
           {entries.map((e, i) => (

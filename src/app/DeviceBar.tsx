@@ -40,8 +40,8 @@ export function DeviceBar({
         <div className="brand-lockup">
           <span className="brand-mark">G</span>
           <span className="brand-copy">
-            <strong>GT65</strong>
-            <small>Keyboard Studio</small>
+            <strong>VORTEX<span className="brand-light">SERIES</span></strong>
+            <small>KEYBOARD STUDIO / GT65</small>
           </span>
         </div>
 
@@ -53,7 +53,7 @@ export function DeviceBar({
               <span className="num text-[var(--ink-3)]">{productName}</span>
             )}
           </span>
-          <button className="btn" onClick={onConnect}>Sambungkan</button>
+          <button className="btn" disabled={status === 'connecting' || status === 'connected'} onClick={onConnect}>{status === 'connected' ? 'Terhubung' : status === 'connecting' ? 'Menghubungkan…' : 'Sambungkan'}</button>
         </div>
 
         <div className="profile-actions">{actions}</div>
@@ -81,7 +81,7 @@ export function DeviceBar({
             <small>Blokir penulisan ke keyboard</small>
           </span>
           <button type="button" role="switch" aria-checked={dryRun}
-                  className="switch" data-on={dryRun}
+                  aria-label="Mode kering" className="switch" data-on={dryRun}
                   onClick={() => onToggleDryRun(!dryRun)}>
             <span className="switch-track"><span className="switch-knob" /></span>
             <span className="switch-state"

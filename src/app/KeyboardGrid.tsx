@@ -1,3 +1,4 @@
+import type { RGB } from '../gt65/perKey';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { KEYS, LAYOUT_SIZE } from '../gt65/layout';
@@ -12,6 +13,7 @@ import { entryLabel, entriesEqual } from '../gt65/keycodes';
  */
 export const BINDING_TAGS: { kind: Entry['kind']; label: string; color: string }[] = [
   { kind: 'none',  label: 'Nonaktif',   color: 'var(--crit)' },
+  { kind: 'consumer', label: 'Sistem', color: 'var(--accent)' },
   { kind: 'media', label: 'Multimedia', color: 'var(--ok)' },
   { kind: 'mouse', label: 'Mouse',      color: 'var(--warn)' },
   { kind: 'macro', label: 'Makro',      color: 'var(--ink-2)' },
@@ -113,11 +115,14 @@ export type KeyboardGridProps = {
   seenUsages?: ReadonlySet<number>;
   /** Jeda bertahap per baris saat papan muncul. */
   reveal?: boolean;
+  colors?: RGB[];
+  selectedKeys?: ReadonlySet<number>;
+  allowFn?: boolean;
 };
 
 export function KeyboardGrid({
   entries, defaultEntries, selected = null, onSelect,
-  heldUsages, seenUsages, reveal = true,
+  heldUsages, seenUsages, reveal = true, colors, selectedKeys, allowFn = false,
 }: KeyboardGridProps) {
   const { ref, scale } = useFitScale();
   const interactive = onSelect !== undefined;
@@ -134,13 +139,15 @@ export function KeyboardGrid({
         {KEYS.map((k) => {
           const e = entries?.[k.keyIndex] ?? { kind: 'none' as const };
           const tag = entries ? TAG_COLOR.get(e.kind) : undefined;
-          const locked = interactive && !isRemappable(k.usage);
+          const locked = interactive && !allowFn && !isRemappable(k.usage);
           const held = heldUsages?.has(k.usage) ?? false;
           const seen = !held && (seenUsages?.has(k.usage) ?? false);
           // Legenda utama = apa yang SEKARANG dilakukan tombol ini, bukan
           // apa yang tercetak di kepalanya. Tanpa `entries` (Tester) tidak
           // ada binding untuk dibaca, jadi tetap tampilkan nama fisiknya.
           const label = entries ? entryLabel(e) : k.name;
+          const picked = selectedKeys ? selectedKeys.has(k.keyIndex) : selected === k.keyIndex;
+          const rgb = colors?.[k.lightIndex];
           const def = defaultEntries?.[k.keyIndex];
           const modified = entries !== undefined && def !== undefined
             && !entriesEqual(e, def);
@@ -153,7 +160,7 @@ export function KeyboardGrid({
             <button key={k.keyIndex} type="button"
               onClick={interactive && !locked ? () => onSelect(k.keyIndex) : undefined}
               disabled={!interactive || locked}
-              aria-pressed={interactive ? selected === k.keyIndex : undefined}
+              aria-pressed={interactive ? picked : undefined}
               title={locked
                 ? 'Fn tidak bisa dipetakan ulang: ia satu-satunya jalan ke '
                   + 'layer Fn, dan keyboard ini tidak bisa dibaca balik untuk '
@@ -161,7 +168,7 @@ export function KeyboardGrid({
                 : `${k.name} · usage 0x${k.usage.toString(16).padStart(2, '0')}`}
               className="kc"
               data-interactive={interactive && !locked}
-              data-selected={interactive && selected === k.keyIndex}
+              data-selected={interactive && picked}
               data-locked={locked}
               data-held={held}
               data-seen={seen}
@@ -170,8 +177,8 @@ export function KeyboardGrid({
                 left: k.x, top: k.y, width: k.w, height: k.h,
                 '--row': rowIndex(k.y),
               } as CSSProperties}>
-              <span className="kc-face">
-                <span className="kc-legend">{label}</span>
+              <span className="kc-face" style={rgb ? { background: `rgb(${rgb.join(',')})`, boxShadow: `inset 0 0 16px #0006` } : undefined}>
+                <span className="kc-legend" style={rgb ? { color: rgb[0] * .299 + rgb[1] * .587 + rgb[2] * .114 > 145 ? '#17121f' : '#ffffff' } : undefined}>{label}</span>
                 {showOriginal && <span className="kc-legend-orig">{k.name}</span>}
                 {tag && <span className="kc-tag" style={{ background: tag }} />}
                 {modified && <span className="kc-modified" />}

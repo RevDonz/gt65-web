@@ -13,6 +13,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         remap: 'index.html',
+        profiles: 'profiles.html',
+        rgb: 'rgb.html',
+        macros: 'macros.html',
         lighting: 'lighting.html',
         tester: 'tester.html',
         settings: 'settings.html',

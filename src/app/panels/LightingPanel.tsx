@@ -1,3 +1,6 @@
+import { useRef, useState } from 'react';
+import { parseLighting } from '../../store/profile';
+import { downloadJson } from '../download';
 import type { CSSProperties } from 'react';
 import type { Profile } from '../../store/profile';
 
@@ -94,6 +97,8 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
   onApply: () => void;
   onApplyVendorReference: () => void;
 }) {
+  const file = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const l = profile.lighting;
   const set = (patch: Partial<typeof l>) =>
     onChange({ ...profile, lighting: { ...l, ...patch } });
@@ -102,10 +107,11 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
     v.toString(16).padStart(2, '0')).join('')}`;
 
   return (
-    <section className="panel settings-card flex max-w-3xl flex-col gap-4 p-5">
-      <div className="label">Pencahayaan</div>
+    <section className="lighting-layout"><div><div className="label mb-3">Studio pencahayaan</div>
       <LightingPreview mode={l.mode} color={hex} speed={l.speed}
                        brightness={l.brightness} direction={l.direction} />
+      <div className="effect-grid" aria-label="Pilihan efek">{LIGHT_MODES.map((name, mode) => mode >= LIGHT_MODE_MIN && mode <= LIGHT_MODE_MAX && <button key={mode} className="effect-card" aria-pressed={l.mode === mode} onClick={() => set({ mode })}><span className="effect-sample" style={{ filter: `hue-rotate(${mode * 27}deg)`, opacity: mode === 19 ? .08 : .8 }} />{name}</button>)}</div>
+      </div><div className="panel settings-card flex flex-col gap-4"><div className="label">Sesuaikan efek</div>
       <label className="flex items-center justify-between gap-4">
         <span className="label">Mode</span>
         <select value={String(l.mode)}
@@ -123,15 +129,7 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
             ))}
         </select>
       </label>
-      <p className="-mt-2 well p-2.5 text-[11px] leading-relaxed text-[var(--ink-2)]">
-        Warna RGB di bawah <strong>tidak berlaku untuk semua mode</strong> —
-        belum diketahui pasti mode mana yang memakainya. Saat warna diset ke
-        kuning, efeknya tidak terlihat di sebagian mode (kemungkinan mode
-        animasi/multiwarna mengabaikan RGB dan memakai warnanya sendiri).
-        Coba tiap mode untuk melihat mana yang benar-benar mengikuti warna
-        yang dipilih.
-      </p>
-
+      <p className="text-[11px] text-[var(--ink-3)]">Sebagian efek multiwarna menggunakan palet bawaan dan dapat mengabaikan warna pilihan.</p>
       <label className="flex items-center justify-between gap-4">
         <span className="label">Warna</span>
         <span className="flex items-center gap-2">
@@ -148,28 +146,19 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
         </span>
       </label>
 
-      <p className="-mt-2 well p-2.5 text-[11px] leading-relaxed text-[var(--ink-2)]">
-        Kecepatan dan kecerahan dibatasi 0-4 (byte kabel 1-5). Batas atas ini
-        berasal dari <code>rgb-keyboard.xml</code> vendor (<code>speed_max=5</code>,
-        <code>brightness_max=5</code>) — ini batas yang didokumentasikan
-        vendor, bukan yang sudah diuji langsung di unit ini. Yang terbukti
-        langsung di hardware baru nilai UI 2 (byte kabel 3); lihat tombol
-        &quot;Kirim nilai vendor (referensi)&quot; di bawah untuk titik lain
-        yang juga terbukti.
-      </p>
-
+      <div className="color-swatches">{['#ae94ff', '#ff6699', '#ff4444', '#ffbb55', '#66ddb0', '#55bbff', '#ffffff'].map((color) => <button key={color} className="color-swatch" aria-label={`Warna ${color}`} aria-pressed={hex === color} style={{ background: color }} onClick={() => set({ r: parseInt(color.slice(1, 3), 16), g: parseInt(color.slice(3, 5), 16), b: parseInt(color.slice(5, 7), 16) })} />)}</div>
       <label className="flex items-center justify-between gap-4">
-        <span className="label">Kecepatan (payload[10])</span>
-        <input type="number" min={0} max={4} value={l.speed}
+        <span className="label">Kecepatan · {l.speed + 1}/5</span>
+        <input type="range" min={0} max={4} value={l.speed}
                onChange={(e) => set({ speed: Number(e.target.value) })}
-               className="field num w-24" />
+               className="w-40" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
-        <span className="label">Kecerahan (payload[9])</span>
-        <input type="number" min={0} max={4} value={l.brightness}
+        <span className="label">Kecerahan · {l.brightness + 1}/5</span>
+        <input type="range" min={0} max={4} value={l.brightness}
                onChange={(e) => set({ brightness: Number(e.target.value) })}
-               className="field num w-24" />
+               className="w-40" />
       </label>
 
       <label className="flex items-center justify-between gap-4">
@@ -192,7 +181,7 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
         Terapkan pencahayaan
       </button>
 
-      <div className="flex flex-col gap-1 border-t border-[var(--edge)] pt-4">
+      <details className="advanced-settings"><summary>Diagnostik pencahayaan lanjutan</summary><p className="mb-3">Rentang normal mengikuti dokumentasi vendor. Nilai referensi berikut berada di luar rentang tersebut dan pernah diuji pada hardware.</p>
         <button onClick={onApplyVendorReference}
                 className="btn justify-center py-2">
           Kirim nilai vendor (referensi)
@@ -207,6 +196,10 @@ export function LightingPanel({ profile, onChange, onApply, onApplyVendorReferen
           berarti seluruh jalur di luar rentang nilai kita (transport,
           framing, payload[8]) sudah benar.
         </p>
+      </details>
+      <div className="flex flex-wrap gap-2"><button className="btn" onClick={() => downloadJson('gt65-lighting.json', { format: 'gt65-lighting', version: 1, lighting: l })}>Ekspor efek</button><button className="btn" onClick={() => file.current?.click()}>Impor efek</button></div>
+      <input ref={file} type="file" hidden accept="application/json" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const raw = JSON.parse(await f.text()); if (raw.format !== 'gt65-lighting' || raw.version !== 1) throw new Error('Format efek tidak didukung.'); const next = parseLighting(raw.lighting); if (next.mode < LIGHT_MODE_MIN || next.mode > LIGHT_MODE_MAX || next.speed > 4 || next.brightness > 4 || next.direction > 3) throw new Error('Nilai efek di luar rentang editor yang telah dikalibrasi.'); set(next); setFileError(null); } catch (err) { setFileError(String(err)); } }} />
+      {fileError && <p role="alert" className="text-[var(--crit)]">{fileError}</p>}
       </div>
     </section>
   );

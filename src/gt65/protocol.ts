@@ -89,9 +89,8 @@ export function lighting(c: Lighting): Uint8Array[] {
 
 export type Settings = {
   /**
-   * Lima boolean di payload[1..5]. Pemetaan indeks ke makna belum
-   * ditentukan — lihat spec Bagian 5.4. Sampai selesai, UI tidak boleh
-   * memberi label pasti pada tiap flag.
+   * Lima boolean di payload[1..5]. Urutan dari encoder vendor 0x426c40: Game Mode, blokir Alt+Tab,
+   * blokir Alt+F4, blokir Windows/Super, Fn toggle.
    */
   flags: [boolean, boolean, boolean, boolean, boolean];
   sleepTimeout: number;
@@ -100,7 +99,7 @@ export type Settings = {
 
 export function settings(c: Settings): Uint8Array[] {
   const f: Fields = { 6: c.sleepTimeout };
-  c.flags.forEach((v, i) => { f[i + 1] = v ? 1 : 0; });
+  c.flags.forEach((v, i) => { f[i + 1] = v && (i === 0 || i === 4 || c.flags[0]) ? 1 : 0; });
   return [
     cmd(0x18),
     cmd(0x17, { 2: c.profileIndex ?? 0, 8: 1 }),
@@ -113,6 +112,7 @@ export type Entry =
   | { kind: 'none' }
   | { kind: 'key'; mod: number; usage: number }
   | { kind: 'media'; usage: number }
+  | { kind: 'consumer'; usage: number }
   | { kind: 'mouse'; ev: 1 | 3; val: number }
   | { kind: 'macro'; slot: number; mode: number; repeat: number };
 
@@ -127,6 +127,7 @@ export function encodeEntry(e: Entry): [number, number, number, number] {
     case 'none':  return [0x00, 0, 0, 0];
     case 'mouse': return [0x01, e.ev, e.val & 0xff, 0];
     case 'key':   return [0x02, e.mod & 0xff, e.usage & 0xff, 0];
+    case 'consumer': return [0x03, e.usage & 0xff, (e.usage >>> 8) & 0xff, 0];
     case 'media': return [0x03, e.usage & 0xff, 0, 0];
     case 'macro': return [0x06, e.slot & 0xff, e.mode & 0xff, e.repeat & 0xff];
   }

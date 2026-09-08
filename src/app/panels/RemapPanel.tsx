@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { KeyboardGrid, BINDING_TAGS } from '../KeyboardGrid';
 import { KEYS } from '../../gt65/layout';
 import {
-  MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS,
+  CONSUMER_ACTIONS, MEDIA_ACTIONS, MOUSE_ACTIONS, SHORTCUTS, HID_KEYS, HID_KEY_GROUPS,
   MOD_NAMES, entriesEqual,
 } from '../../gt65/keycodes';
 import type { Entry, Layer } from '../../gt65/protocol';
@@ -65,6 +65,7 @@ export function describeEntry(entry: Entry | undefined): string {
       const mods = MOD_NAMES.filter(([bit]) => entry.mod & bit).map(([, n]) => n);
       return [...mods, label].join(' + ');
     }
+    case 'consumer': return CONSUMER_ACTIONS.find((a) => a.entry.kind === 'consumer' && a.entry.usage === entry.usage)?.label ?? `Consumer ${entry.usage}`;
     case 'media':
       return MEDIA_ACTIONS.find((a) => a.entry.kind === 'media'
         && a.entry.usage === entry.usage)?.label ?? `multimedia 0x${entry.usage.toString(16)}`;
@@ -97,9 +98,9 @@ export function RemapPanel({ profile, onChange, onApply }: {
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex overflow-hidden rounded-[3px] border border-[var(--edge-bright)]">
+    <section className="remap-panel flex flex-col gap-4">
+      <div className="remap-toolbar flex flex-wrap items-center gap-3">
+        <div className="layer-switch">
           {(['top', 'fn'] as Layer[]).map((l) => (
             <button key={l} onClick={() => setLayer(l)}
                     aria-pressed={layer === l}
@@ -124,10 +125,10 @@ export function RemapPanel({ profile, onChange, onApply }: {
       {/* Keyboard selalu memakai lebar penuh. Editor ditumpuk di bawah agar
           tidak pernah menimpa atau mempersempit kanvas keyboard. */}
       <div className="flex flex-col gap-5" data-remap-layout="stacked">
-        <div className="flex flex-col gap-3">
+        <div className="keyboard-card"><div className="keyboard-card-heading"><span><strong>GT65</strong><small>VORTEXSERIES / 65% LAYOUT</small></span><span className="pill">{layer === 'top' ? 'Layer utama' : 'Layer Fn'}</span></div><div className="keyboard-canvas">
           <KeyboardGrid entries={entries} defaultEntries={defaultEntries}
-                        selected={selected} onSelect={setSelected} />
-          <div className="flex flex-wrap items-center gap-4">
+                        selected={selected} onSelect={setSelected} /></div>
+          <div className="keyboard-legend flex flex-wrap items-center gap-4">
             {BINDING_TAGS.map((t) => (
               <span key={t.kind} className="flex items-center gap-1.5 text-[10px]
                                             text-[var(--ink-3)]">
@@ -142,6 +143,7 @@ export function RemapPanel({ profile, onChange, onApply }: {
           </div>
         </div>
 
+        {selected === null && <div className="editor-empty panel"><span className="empty-keycap">A</span><div><h2>Mulai dari satu tombol</h2><p>Pilih tombol di atas, lalu atur tombol, shortcut, multimedia, atau aksi mouse.</p></div><span className="step-hint">01 Pilih tombol → 02 Atur fungsi → 03 Terapkan</span></div>}
         {selected !== null && (
           <aside className="panel flex flex-col overflow-hidden">
             <div className="flex items-baseline gap-2 border-b
@@ -187,6 +189,14 @@ export function RemapPanel({ profile, onChange, onApply }: {
                 {MEDIA_ACTIONS.map((a) => (
                   <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>
                 ))}
+              </Group>
+              <Group title="Sistem & browser">
+                <p className="text-[11px] text-[var(--ink-3)]">Respons mengikuti dukungan desktop Linux.</p>
+                {CONSUMER_ACTIONS.map((a) => <Btn key={a.id} onClick={() => assign(a.entry)}>{a.label}</Btn>)}
+              </Group>
+              <Group title="Kombinasi sendiri">
+                <p className="text-[11px] text-[var(--ink-3)]">Pilih tombol biasa, lalu tambahkan modifier.</p>
+                {MOD_NAMES.map(([bit, name]) => <label key={bit} className="flex items-center gap-2 text-[12px]"><input type="checkbox" disabled={entries[selected].kind !== 'key'} checked={entries[selected].kind === 'key' && !!(entries[selected].mod & bit)} onChange={() => { const e = entries[selected]; if (e.kind === 'key') assign({ ...e, mod: e.mod ^ bit }); }} />{name}</label>)}
               </Group>
               <Group title="Mouse">
                 {MOUSE_ACTIONS.map((a) => (

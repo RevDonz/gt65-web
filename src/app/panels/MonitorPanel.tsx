@@ -32,9 +32,7 @@ export function MonitorPanel({ device }: { device: HIDDevice | null }) {
 
   if (!device) {
     return (
-      <p className="panel px-4 py-3 text-[12px] text-[var(--ink-2)]">
-        Sambungkan keyboard untuk memantau.
-      </p>
+      <div className="empty-state"><span className="empty-keycap">⌁</span><strong>Menunggu keyboard Anda</strong><p>Sambungkan GT65 melalui tombol Sambungkan di atas untuk melihat aktivitas dari interface vendor secara langsung.</p><span className="pill">Monitor HID · Hingga 200 event</span></div>
     );
   }
 

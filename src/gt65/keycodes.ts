@@ -41,6 +41,17 @@ export const MEDIA_ACTIONS: Action[] = [
   { id: 'mute',       label: 'Bisukan',      short: 'Bisu',   entry: { kind: 'media', usage: 0xe2 } },
 ];
 
+
+/** Consumer usage values; vendor macrotype 12 writes little-endian 16-bit usage. */
+export const CONSUMER_ACTIONS: Action[] = [
+  ['computer', 'File manager', 0x194], ['calculator', 'Kalkulator', 0x192],
+  ['email', 'Email', 0x18a], ['media_app', 'Pemutar media', 0x183],
+  ['web', 'Browser', 0x196], ['refresh', 'Web: muat ulang', 0x227],
+  ['web_stop', 'Web: hentikan', 0x226], ['back', 'Web: kembali', 0x224],
+  ['forward', 'Web: maju', 0x225], ['favorites', 'Web: favorit', 0x22a],
+  ['search', 'Web: pencarian', 0x221],
+].map(([id, label, usage]) => ({ id: String(id), label: String(label), entry: { kind: 'consumer', usage: Number(usage) } }));
+
 export const MOUSE_ACTIONS: Action[] = [
   { id: 'left',        label: 'Klik kiri',                       entry: { kind: 'mouse', ev: 1, val: 0x01 } },
   { id: 'right',       label: 'Klik kanan',                      entry: { kind: 'mouse', ev: 1, val: 0x02 } },
@@ -212,6 +223,7 @@ export function entriesEqual(a: Entry, b: Entry): boolean {
   switch (a.kind) {
     case 'none':  return true;
     case 'key':   return b.kind === 'key' && a.mod === b.mod && a.usage === b.usage;
+    case 'consumer': return b.kind === 'consumer' && a.usage === b.usage;
     case 'media': return b.kind === 'media' && a.usage === b.usage;
     case 'mouse': return b.kind === 'mouse' && a.ev === b.ev && a.val === b.val;
     case 'macro': return b.kind === 'macro' && a.slot === b.slot
@@ -244,6 +256,7 @@ export function entryLabel(entry: Entry): string {
       const mods = MOD_NAMES.filter(([bit]) => entry.mod & bit).map(([, n]) => n);
       return [...mods, keyLabel].join('+');
     }
+    case 'consumer': return CONSUMER_ACTIONS.find((a) => a.entry.kind === 'consumer' && a.entry.usage === entry.usage)?.label ?? 'Sistem';
     case 'media': {
       const a = MEDIA_ACTIONS.find((x) => x.entry.kind === 'media' && x.entry.usage === entry.usage);
       return a?.short ?? a?.label ?? '?';

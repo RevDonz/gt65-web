@@ -1,9 +1,13 @@
+import { parseMacros } from '../gt65/macros';
+import type { Macro } from '../gt65/macros';
+import { parseColors } from '../gt65/perKey';
+import type { RGB } from '../gt65/perKey';
 import { TABLE_ENTRIES } from '../gt65/protocol';
 import type { Entry, Lighting, Settings } from '../gt65/protocol';
 import { KEYS } from '../gt65/layout';
 
 export const STORAGE_KEY = 'gt65.profile';
-const VERSION = 2;
+const VERSION = 3;
 
 /**
  * Asal-usul profil di browser ini. `'default'` berarti belum pernah
@@ -26,6 +30,8 @@ export type Profile = {
   layers: { top: Entry[]; fn: Entry[] };
   lighting: Lighting;
   settings: Settings;
+  perKeyColors?: RGB[];
+  macros?: Macro[];
 };
 
 function emptyLayer(): Entry[] {
@@ -131,6 +137,9 @@ function parseEntry(v: unknown, where: string): Entry {
       return { kind: 'key',
                mod: byte(e.mod, `modifier entri ${where}`),
                usage: byte(e.usage, `usage entri ${where}`) };
+    case 'consumer':
+      if (!Number.isInteger(e.usage) || (e.usage as number) < 0 || (e.usage as number) > 65535) fail('Usage consumer harus bilangan bulat 0–65535.');
+      return { kind: 'consumer', usage: e.usage as number };
     case 'media':
       return { kind: 'media', usage: byte(e.usage, `usage media entri ${where}`) };
     case 'mouse':
@@ -155,7 +164,7 @@ function parseLayer(v: unknown, name: string): Entry[] {
   return v.map((e, i) => parseEntry(e, `${name}[${i}]`));
 }
 
-function parseLighting(v: unknown): Lighting {
+export function parseLighting(v: unknown): Lighting {
   if (typeof v !== 'object' || v === null) {
     fail('Profil rusak: blok pencahayaan tidak ada.');
   }
@@ -200,7 +209,7 @@ function parseSettings(v: unknown): Settings {
 
 /**
  * VERSION 1 tidak punya `provenance`/`backedUp` — keduanya ditambahkan saat
- * VERSION dinaikkan ke 2. Sebelum fungsi ini ada, profil v1 tersimpan
+ * VERSION saat itu dinaikkan ke 2. Sebelum fungsi ini ada, profil v1 tersimpan
  * gagal pemeriksaan versi di `parseProfile` dan `loadProfile` diam-diam
  * menimpanya dengan `defaultProfile()` — pada keyboard yang tidak bisa
  * dibaca balik, itu MEMBUANG satu-satunya catatan konfigurasi pengguna.
@@ -234,6 +243,8 @@ function migrateV1(p: Record<string, unknown>): Profile {
       top: parseLayer(layers.top, 'utama'),
       fn: parseLayer(layers.fn, 'Fn'),
     },
+    ...(p.macros === undefined ? {} : { macros: parseMacros(p.macros) }),
+    ...(p.perKeyColors === undefined ? {} : { perKeyColors: parseColors(p.perKeyColors) }),
     lighting: parseLighting(p.lighting),
     settings: parseSettings(p.settings),
   };
@@ -246,7 +257,7 @@ function migrateV1(p: Record<string, unknown>): Profile {
  * field asing tidak ikut terbawa ke penyimpanan atau ke perangkat.
  *
  * VERSION 1 dimigrasi lewat `migrateV1` alih-alih ditolak — lihat doc
- * comment-nya. Versi lain (bukan 1, bukan VERSION saat ini) tetap ditolak.
+ * comment-nya. Versi lain (bukan 1, 2, atau VERSION saat ini) tetap ditolak.
  */
 export function parseProfile(v: unknown): Profile {
   if (typeof v !== 'object' || v === null) {
@@ -256,7 +267,7 @@ export function parseProfile(v: unknown): Profile {
   if (p.version === 1) {
     return migrateV1(p);
   }
-  if (p.version !== VERSION) {
+  if (p.version !== 2 && p.version !== VERSION) {
     fail(`Versi profil ${String(p.version)} tidak dikenal, harus ${VERSION}.`);
   }
   if (typeof p.name !== 'string') {
@@ -278,6 +289,8 @@ export function parseProfile(v: unknown): Profile {
       top: parseLayer(layers.top, 'utama'),
       fn: parseLayer(layers.fn, 'Fn'),
     },
+    ...(p.macros === undefined ? {} : { macros: parseMacros(p.macros) }),
+    ...(p.perKeyColors === undefined ? {} : { perKeyColors: parseColors(p.perKeyColors) }),
     lighting: parseLighting(p.lighting),
     settings: parseSettings(p.settings),
   };
@@ -337,7 +350,9 @@ export function importProfile(json: string): Profile {
 // --- Pengaman menimpa konfigurasi tak terlihat -----------------------------
 
 function sameContent(a: Profile, b: Profile): boolean {
-  return JSON.stringify(a.layers) === JSON.stringify(b.layers)
+  return JSON.stringify(a.macros) === JSON.stringify(b.macros)
+      && JSON.stringify(a.perKeyColors) === JSON.stringify(b.perKeyColors)
+      && JSON.stringify(a.layers) === JSON.stringify(b.layers)
       && JSON.stringify(a.lighting) === JSON.stringify(b.lighting)
       && JSON.stringify(a.settings) === JSON.stringify(b.settings);
 }

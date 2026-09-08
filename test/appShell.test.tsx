@@ -22,14 +22,10 @@ async function mountApp(initialPage: Page = 'Remap') {
   const el = document.createElement('div');
   document.body.appendChild(el);
   const root = createRoot(el);
-  let page = initialPage;
-  const renderPage = async () => {
-    await act(async () => { root.render(<App key={page} initialPage={page} />); });
-  };
-  await renderPage();
+  await act(async () => { root.render(<App initialPage={initialPage} />); });
   const clickTab = async (name: string) => {
-    page = name as Page;
-    await renderPage();
+    const link = el.querySelector<HTMLAnchorElement>(`nav a[aria-label="${name}"]`)!;
+    await act(async () => { link.click(); });
   };
   const cleanup = async () => {
     await act(async () => { root.unmount(); });
@@ -39,15 +35,15 @@ async function mountApp(initialPage: Page = 'Remap') {
 }
 
 describe('kerangka aplikasi', () => {
-  test('default membuka Remap dan navigasi memakai halaman penuh', async () => {
+  test('default membuka Remap dan navigasi berpindah panel tanpa remount', async () => {
     const { el, clickTab, cleanup } = await mountApp();
-    expect(el.querySelector('h1')?.textContent).toContain('Atur fungsi');
+    expect(el.querySelector('h1')?.textContent).toContain('Keyboard Anda');
     const pages: Page[] = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'];
     expect([...el.querySelectorAll('nav a')].map((a) => a.getAttribute('href')))
-      .toEqual(['/', '/lighting.html', '/tester.html', '/settings.html', '/monitor.html', '/log.html']);
+      .toEqual(['/', '/macros.html', '/lighting.html', '/rgb.html', '/profiles.html', '/settings.html', '/tester.html', '/monitor.html', '/log.html']);
     for (const name of pages) {
       await clickTab(name);
-      expect(el.textContent).toContain(name);
+      expect(el.querySelector(`nav a[aria-label="${name}"]`)?.getAttribute('aria-selected')).toBe('true');
     }
     await cleanup();
   });
@@ -93,7 +89,7 @@ describe('halaman Lighting', () => {
     expect(preview().querySelectorAll('.preview-key')).toHaveLength(24);
 
     const mode = el.querySelector<HTMLSelectElement>('select')!;
-    const numberInputs = el.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    const numberInputs = el.querySelectorAll<HTMLInputElement>('input[type="range"]');
     const speed = numberInputs[0];
     const brightness = numberInputs[1];
     const setInput = (input: HTMLInputElement, value: string) => {

@@ -1,3 +1,9 @@
+import { MacroPanel } from './panels/MacroPanel';
+import { PerKeyPanel } from './panels/PerKeyPanel';
+import { perKeyLighting, defaultColors } from '../gt65/perKey';
+import { loadLibrary, LIBRARY_KEY, newProfileItem } from '../store/library';
+import type { ProfileLibrary } from '../store/library';
+import { ProfilesPanel } from './panels/ProfilesPanel';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { DeviceBar } from './DeviceBar';
@@ -14,16 +20,19 @@ import { TesterPanel } from './panels/TesterPanel';
 import { lighting, settings, remap } from '../gt65/protocol';
 import type { Layer } from '../gt65/protocol';
 import {
-  defaultProfile, exportProfile, importProfile, loadProfile, saveProfile,
+  defaultProfile, exportProfile, importProfile, saveProfile,
   needsOverwriteWarning, promoteProvenance,
 } from '../store/profile';
 import type { Profile } from '../store/profile';
 import { OverwriteGuardModal } from './OverwriteGuardModal';
 
-export const PAGES = ['Remap', 'Lampu', 'Tester', 'Pengaturan', 'Monitor', 'Log'] as const;
+export const PAGES = ['Remap', 'Makro', 'Lampu', 'RGB', 'Profil', 'Pengaturan', 'Tester', 'Monitor', 'Log'] as const;
 export type Page = (typeof PAGES)[number];
 
 export const PAGE_HREF: Record<Page, string> = {
+  Makro: '/macros.html',
+  RGB: '/rgb.html',
+  Profil: '/profiles.html',
   Remap: '/',
   Lampu: '/lighting.html',
   Tester: '/tester.html',
@@ -44,9 +53,12 @@ function loadDryRun(): boolean {
 }
 
 const TAB_META: Record<Page, { eyebrow: string; title: string; description: string }> = {
+  Makro: { eyebrow: 'Macro Studio', title: 'Rangkai setiap aksi.', description: 'Rekam dan susun urutan tombol dalam pustaka makro lokal.' },
+  RGB: { eyebrow: 'Per-key RGB', title: 'Warna untuk setiap tombol.', description: 'Lukis keyboard Anda dengan skema warna sendiri.' },
+  Profil: { eyebrow: 'Profiles', title: 'Satu keyboard, banyak kebiasaan.', description: 'Kelola dan duplikasikan konfigurasi untuk setiap aktivitas.' },
   Remap: {
     eyebrow: 'Keymap',
-    title: 'Atur fungsi setiap tombol',
+    title: 'Keyboard Anda. Cara Anda.',
     description: 'Pilih layer, klik tombol pada keyboard, lalu tentukan fungsi barunya.',
   },
   Lampu: {
@@ -82,6 +94,9 @@ const TAB_META: Record<Page, { eyebrow: string; title: string; description: stri
  * sebagai satu set, seperti sablon pada panel alat.
  */
 const ICONS: Record<Page, ReactNode> = {
+  Makro: <><path d="m5 7 5 5-5 5M12 17h7" /><rect x="2" y="3" width="20" height="18" rx="2" /></>,
+  RGB: <><path d="M12 3a9 9 0 1 0 9 9c0-3-5-1-5-4 0-2-2-5-4-5Z" /><circle cx="7" cy="12" r="1" /><circle cx="11" cy="7" r="1" /></>,
+  Profil: <><rect x="4" y="7" width="16" height="14" rx="2" /><path d="M8 3h8M8 12h8M8 16h5" /></>,
   Remap: (
     <>
       <rect x="3" y="4" width="8" height="8" rx="1.5" />
@@ -138,8 +153,20 @@ function exportFilename(name: string): string {
 
 export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
   const [dryRun, setDryRun] = useState(loadDryRun);
-  const tab = initialPage;
-  const [profile, setProfileState] = useState<Profile>(loadProfile);
+  const [tab, setTab] = useState<Page>(initialPage);
+  const [initialLibrary] = useState(loadLibrary);
+  const [library, setLibrary] = useState(initialLibrary.library);
+  const profile = library.items.find((item) => item.id === library.activeId)!.profile;
+  const persistLibrary = (next: ProfileLibrary) => {
+    setLibrary(next);
+    const active = next.items.find((item) => item.id === next.activeId)!.profile;
+    try {
+      // A corrupt source is retained for recovery, never silently overwritten.
+      if (initialLibrary.error) throw new Error(initialLibrary.error);
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(next));
+      setSaveFailed(!saveProfile(active));
+    } catch { setSaveFailed(true); }
+  };
   const [importError, setImportError] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   // Layer yang menunggu konfirmasi di OverwriteGuardModal — lihat
@@ -167,8 +194,7 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
    */
   const setProfile = (p: Profile) => {
     const next = promoteProvenance(profile, p);
-    setProfileState(next);
-    setSaveFailed(!saveProfile(next));
+    persistLibrary({ ...library, items: library.items.map((item) => item.id === library.activeId ? { ...item, profile: next } : item) });
   };
 
   const handleExport = () => {
@@ -211,7 +237,9 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
     if (!file) return;
     try {
       const text = await file.text();
-      setProfile(importProfile(text));
+      if (library.items.length >= 100) throw new Error('Pustaka penuh: maksimum 100 profil.');
+      const item = newProfileItem(importProfile(text));
+      persistLibrary({ ...library, activeId: item.id, items: [...library.items, item] });
       setImportError(null);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : String(err));
@@ -273,18 +301,22 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
       <div className="app-body">
         <nav role="tablist" aria-orientation="vertical" aria-label="Panel"
              className="side-nav">
-          <div className="side-nav-label">Workspace</div>
+          <div className="nav-device"><span className="device-mini">GT<span>65</span></span><strong>VortexSeries GT65</strong><small>65% Mechanical Keyboard</small><span className="device-platform">LINUX EDITION</span></div><div className="side-nav-label">Kustomisasi</div>
           {PAGES.map((t) => (
             <a key={t} role="tab" aria-label={t} aria-selected={tab === t}
                aria-current={tab === t ? 'page' : undefined}
-               className="rail-item" href={PAGE_HREF[t]}>
+               className="rail-item" data-section={t === 'Tester' ? 'diagnostics' : undefined} href={PAGE_HREF[t]}
+               onClick={(event) => {
+                 if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                 event.preventDefault(); setTab(t);
+               }}>
               <RailIcon tab={t} />
-              <span>{t}</span>
+              <span>{{ Remap: 'Pemetaan tombol', Lampu: 'Pencahayaan', Tester: 'Uji keyboard', Pengaturan: 'Pengaturan', Monitor: 'Monitor HID', Log: 'Riwayat aktivitas', Profil: 'Pustaka profil', RGB: 'RGB per tombol', Makro: 'Studio makro' }[t]}</span>
             </a>
           ))}
           <div className="side-nav-foot">
             <span className="num">GT-65 / 65%</span>
-            <span>WebHID configurator</span>
+            <span>Dirancang untuk Linux</span><span>Komunitas · Independen</span>
           </div>
         </nav>
 
@@ -316,8 +348,9 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
                 <h1>{meta.title}</h1>
                 <p>{meta.description}</p>
               </div>
-              <div className="page-context num">{profile.name}</div>
+              <label className="profile-name"><span className="label">Profil aktif</span><input aria-label="Nama profil" maxLength={80} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /><small>{saveFailed ? 'Gagal menyimpan' : 'Tersimpan lokal otomatis'}</small></label>
             </header>
+            {initialLibrary.error && <p role="alert" className="panel p-3 mb-4 text-[var(--warn)]">{initialLibrary.error}</p>}
             {importError && (
               <p className="panel mb-4 px-3 py-2 text-[12px]"
                  style={{ borderColor: 'var(--crit)', color: 'var(--crit)' }}>
@@ -338,6 +371,13 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
             )}
 
             <div key={tab} className="panel-swap page-content">
+              {tab === 'Makro' && <MacroPanel key={library.activeId} profile={profile} onChange={setProfile} />}
+              {tab === 'RGB' && <PerKeyPanel key={library.activeId} profile={profile} onChange={setProfile} onApply={() => dev.send('Terapkan RGB per tombol', ...perKeyLighting(profile.perKeyColors ?? defaultColors()))} />}
+              {tab === 'Profil' && <ProfilesPanel library={library}
+                onSelect={(activeId) => persistLibrary({ ...library, activeId })}
+                onCreate={() => { if (library.items.length >= 100) return; const item = newProfileItem({ ...defaultProfile(), name: `Profil ${library.items.length + 1}` }); persistLibrary({ ...library, activeId: item.id, items: [...library.items, item] }); }}
+                onDuplicate={(id) => { if (library.items.length >= 100) return; const source = library.items.find((i) => i.id === id)!.profile; const item = newProfileItem({ ...structuredClone(source), name: `${source.name} (salinan)`, backedUp: false }); persistLibrary({ ...library, activeId: item.id, items: [...library.items, item] }); }}
+                onDelete={(id) => { if (library.items.length <= 1) return; const items = library.items.filter((i) => i.id !== id); persistLibrary({ ...library, items, activeId: library.activeId === id ? items[0].id : library.activeId }); }} />}
               {tab === 'Remap' && (
                 <RemapPanel profile={profile} onChange={setProfile}
                             onApply={handleRemapApply} />
@@ -371,6 +411,7 @@ export function App({ initialPage = 'Remap' }: { initialPage?: Page }) {
             </div>
 
           </div>
+          <footer className="workspace-footer"><span><span className="dot" data-state={dev.status} />{dev.status === 'connected' ? 'Keyboard tersambung' : 'Konfigurasi lokal'} · VortexSeries GT65</span><span>{dryRun ? 'Pratinjau aman' : 'Penulisan langsung'} · USB / WebHID</span></footer>
         </main>
       </div>
     </div>

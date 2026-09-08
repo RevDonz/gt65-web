@@ -389,7 +389,7 @@ describe('migrasi profil versi 1', () => {
     const v1 = v1Profile();
     store(v1);
     const loaded = loadProfile();
-    expect(loaded.version).toBe(2);
+    expect(loaded.version).toBe(3);
     expect(loaded.provenance).toBe('edited');
     expect(loaded.backedUp).toBe(false);
     expect(loaded.name).toBe('Profil Lama');
@@ -417,7 +417,7 @@ describe('migrasi profil versi 1', () => {
   test('berkas ekspor v1 lama tetap bisa diimpor', () => {
     const v1 = v1Profile();
     const imported = importProfile(JSON.stringify(v1));
-    expect(imported.version).toBe(2);
+    expect(imported.version).toBe(3);
     // Impor selalu menandai provenance/backedUp sendiri, sama seperti v2.
     expect(imported.provenance).toBe('imported');
     expect(imported.backedUp).toBe(true);

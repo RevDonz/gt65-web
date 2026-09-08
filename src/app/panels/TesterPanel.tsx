@@ -192,6 +192,7 @@ export function TesterPanel({ profile }: { profile: Profile }) {
         menyala saat ditekan terlihat seperti bug meski resolver di atas
         sudah benar.
       */}
+      <progress className="test-progress" aria-label="Progres pengujian tombol" value={done} max={total} />
       <KeyboardGrid entries={profile.layers.top} defaultEntries={DEFAULT_TOP}
                     heldUsages={heldUsages} seenUsages={seenUsages} />
 
@@ -202,8 +203,8 @@ export function TesterPanel({ profile }: { profile: Profile }) {
         </p>
       )}
 
-      <div className="panel max-w-3xl px-4 py-3 text-[12px] leading-relaxed text-[var(--ink-2)]">
-        <div className="label mb-2">Apa yang sebenarnya diuji</div>
+      <details className="panel px-5 py-4 text-[12px] leading-relaxed text-[var(--ink-2)]">
+        <summary className="cursor-pointer">Panduan pengujian &amp; batasan deteksi</summary>
         <p>
           Tester ini membaca <strong>event keyboard yang sampai ke sistem
           operasi</strong>, bukan laporan yang dikirim keyboard. Chromium
@@ -244,7 +245,7 @@ export function TesterPanel({ profile }: { profile: Profile }) {
             untuk berpindah tab.
           </li>
         </ul>
-      </div>
+      </details>
     </div>
   );
 }
