@@ -1,4 +1,4 @@
-GT65 Configurator **v0.2.0** membawa UI Keyboard Studio baru dan editor tambahan untuk VortexSeries GT65 di Linux. Rilis ini memakai kode branch `master`.
+GT65 Configurator **v0.2.0** membawa UI Keyboard Studio baru dan editor tambahan untuk VortexSeries GT65 di Linux. Rilis ini memakai kode branch `main`.
 
 ## Perubahan
 
